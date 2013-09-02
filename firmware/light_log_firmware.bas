@@ -24,62 +24,119 @@
 ;POSSIBILITY OF SUCH DAMAGE.
 ;
 ;
-; PICAXE 08M2 ADC inputs for RGB light level logging
-;                        _____
-;                   +V -|1 ^ 8|- 0V
-;     In/Serial In C.5 -|2   7|- C.0 Serial Out/Out/hserout/DAC
-; Touch/ADC/Out/In C.4 -|3   6|- C.1 In/Out/ADC/Touch/hserin/SRI/hi2c scl
-;               In C.3 -|4   5|- C.2 In/Out/ADC/Touch/pwm/tune/SRQ/hi2c sda
-;                        –––––
+; 14M2 ADC inputs for RGB light level logging to i2c 64K eprom
+;                                  _____
+;                             +V -|1 ^14|- 0V
+;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
+;           Touch/ADC/Out/In C.4 -|3  12|- B.1 In/Out/ADC/Touch/SRI/hserin
+;                         In C.3 -|4  11|- B.2 In/Out/ADC/Touch/pwm/SRQ
+;     kbclk/hpwmA/pwm/Out/In C.2 -|5  10|- B.3 In/Out/ADC/Touch/hi2c scl
+;        kbdata/hpwmB/Out/In C.1 -|6   9|- B.4 In/Out/ADC/Touch/pwm/hi2c sda
+; hpwmC/pwm/Touch/ADC/Out/In C.0 -|7   8|- B.5 In/Out/ADC/Touch/hpwmD
+;                                  –––––
+;                                  _____
+;                             +V -|1 ^14|- 0V
+;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
+;                            C.4 -|3  12|- B.1 Red ADC
+;                            C.3 -|4  11|- B.2 Green ADC
+;                            C.2 -|5  10|- B.3 hi2c scl
+;                            C.1 -|6   9|- B.4 hi2c sda
+;                        LED C.0 -|7   8|- B.5 Blue ADC
+;                                  –––––
+; CHANGE LOG:
+; v2 Corrected for full 64K
+; v1 Kinda working
 ;
-;                        _____
-;                   +V -|1 ^ 8|- 0V
-;     In/Serial In C.5 -|2   7|- C.0 Data out to audio jack?
-;      Blue ADC in C.4 -|3   6|- C.1 Red ADC in
-;               In C.3 -|4   5|- C.2 Green ADC in
-;                        –––––
+; TODO:
+; - Continue from last record after loss of power
+; - When full, compress data 50% and double number of samples per average save
+; - Calculate and store sample varience
+; - Test fill and read back full 64K eprom
+; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
 
-#picaxe 08m2
+#picaxe 14m2
 
 init:
-    setfreq m1
-    symbol red = b0
-    symbol green = b1
-    symbol blue = b2
-    symbol i = b3
-    symbol addr = b4
-    symbol j = b5
-    symbol red_w = w3
-    symbol green_w = w4
-    symbol blue_w = w5
+    ;setfreq m1
+    hi2csetup i2cmaster, %10100000, i2cslow, i2cword
+
+    symbol red = w0
+    symbol green = w1
+    symbol blue = w2
+    symbol red_avg = w3
+    symbol green_avg = w4
+    symbol blue_avg = w5
+    symbol i = w6
+    symbol j = b14
+    symbol red_byte = b15
+    symbol green_byte = b16
+    symbol blue_byte = b17
+    symbol extra_byte = b18
+
+    ; LED off
+    low C.0
+
+    ; Pre-fill rolling averages
+    readadc10 B.1, red_avg
+    readadc10 B.2, green_avg
+    readadc10 B.5, blue_avg
 
 main:
-    for i = 0 to 255 step 3
-        red_w = 0
-        green_w = 0
-        blue_w = 0
-        ; Gather average readings
-        for j = 0 to 5
-            readadc C.1, red
-            readadc C.2, green
-            readadc C.4, blue
-            sertxd(#red, ",", #green, ",", #blue, 13)
-            red_w = red_w + red
-            green_w = green_w + green
-            blue_w = blue_w + blue
-            ; 4 = ten seconds between samples (2.3sec per unit)
-            ;disablebod
-            ;sleep 4
-            ;enablebod
+    ; Datadump after a powercycle
+    goto data_dump
+
+data_log:
+    for i = 0 to 65532 step 4
+        ; Gather readings
+        pulsout C.0, 100
+        for j = 0 to 9
+            readadc10 B.1, red
+            readadc10 B.2, green
+            readadc10 B.5, blue
+            sertxd("raw:", #red, ",", #green, ",", #blue, 13)
+
+            ; Calculate rolling averages
+            red_avg = red_avg / 2
+            red_avg = red / 2 + red_avg
+            green_avg = green_avg / 2
+            green_avg = green / 2 + green_avg
+            blue_avg = blue_avg / 2
+            blue_avg = blue / 2 + blue_avg
+
+            ; Save some power
+            disablebod
+            sleep 1 ; 2.3sec per sample
+            enablebod
         next j
-        red = red_w / 6
-        green = green_w / 6
-        blue = blue_w / 6
-        addr = i
-        write addr, red
-        addr = addr + 1
-        write addr, green
-        addr = addr + 1
-        write addr, blue
+
+        sertxd("avg:", #red_avg, ",", #green_avg, ",", #blue_avg, 13)
+
+        ; Store least significant bytes
+        red_byte = red_avg & %11111111
+        green_byte = green_avg & %11111111
+        blue_byte = blue_avg & %11111111
+
+        ; Fill extra_byte with 10bit excess rgb bits
+        extra_byte = red_avg & %1100000000 / 256
+        extra_byte = green_avg & %1100000000 / 64 + extra_byte
+        extra_byte = blue_avg & %1100000000 / 16 + extra_byte
+
+        ; Write to eprom
+        hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+
+        ; Read it back in from eprom to test!
+        hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    next i
+
+    goto data_log
+
+data_dump:
+    ; Output eprom data
+    sleep 4
+    for i = 0 to 65532 step 4
+        hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
     next
-    goto main
+    end
