@@ -44,6 +44,7 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v3 Fixed (maybe) bugs with for loops near max int
 ; v2 Corrected for full 64K
 ; v1 Kinda working
 ;
@@ -58,7 +59,7 @@
 
 init:
     ;setfreq m1
-    hi2csetup i2cmaster, %10100000, i2cslow, i2cword
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
     symbol red = w0
     symbol green = w1
@@ -66,12 +67,20 @@ init:
     symbol red_avg = w3
     symbol green_avg = w4
     symbol blue_avg = w5
+
     symbol i = w6
-    symbol j = b14
-    symbol red_byte = b15
-    symbol green_byte = b16
-    symbol blue_byte = b17
-    symbol extra_byte = b18
+    symbol i1 = b12 ; lower byte of i word
+    symbol i2 = b13 ; upper byte of i word
+
+    symbol j = w7
+    symbol j1 = b14 ; lower byte of j word
+    symbol j2 = b15 ; upper byte of j word
+
+    symbol red_byte = b16
+    symbol green_byte = b17
+    symbol blue_byte = b18
+    symbol extra_byte = b19
+    symbol test_read = b20
 
     ; LED off
     low C.0
@@ -83,17 +92,17 @@ init:
 
 main:
     ; Datadump after a powercycle
-    goto data_dump
+    ;goto data_dump
+    ;goto data_erase
 
 data_log:
-    for i = 0 to 65532 step 4
+    for i = 0 to 65531 step 4
         ; Gather readings
         pulsout C.0, 100
         for j = 0 to 9
             readadc10 B.1, red
             readadc10 B.2, green
             readadc10 B.5, blue
-            sertxd("raw:", #red, ",", #green, ",", #blue, 13)
 
             ; Calculate rolling averages
             red_avg = red_avg / 2
@@ -109,8 +118,6 @@ data_log:
             enablebod
         next j
 
-        sertxd("avg:", #red_avg, ",", #green_avg, ",", #blue_avg, 13)
-
         ; Store least significant bytes
         red_byte = red_avg & %11111111
         green_byte = green_avg & %11111111
@@ -123,11 +130,20 @@ data_log:
 
         ; Write to eprom
         hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
 
         ; Read it back in from eprom to test!
-        hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        ;pause 5
+        ;hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+        ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+
+        ; Write position to eprom
+        write 0, WORD i
+        ;hi2cout 0, (i1, i2)
+        ;sertxd("Position ", #i, ", ", #i1, ", ", #i2, 13)
+
+        ; Read it back in from eprom to test!
+        ;hi2cin 0, (j1, j2)
+        ;sertxd("Samples ", #j, ", ", #j1, ", ", #j2, 13)
     next i
 
     goto data_log
@@ -135,8 +151,30 @@ data_log:
 data_dump:
     ; Output eprom data
     sleep 4
-    for i = 0 to 65532 step 4
+    read 0, WORD j
+    ;hi2cin 0, (j1, j2)
+    ;sertxd("Samples ", #j, ", ", #j1, ", ", #j2, 13)
+    for i = 2 to j step 4
+    ;for i = 0 to 65531 step 4
         hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    next i
+    end
+
+data_erase:
+    ; Erase eprom data (help with debugging)
+    sleep 4
+    sertxd("Erasing data ")
+    for i = 0 to 65534
+        hi2cout i, (255)
+        hi2cin i, (test_read)
+        if test_read != 255 then
+            sertxd("Error:", #test_read, "@", #i)
+        endif
+        j = i % 255
+        if j = 0 then
+            sertxd(#i, ", ")
+        endif
     next
+    sertxd(13, "All data erased", 13)
     end
