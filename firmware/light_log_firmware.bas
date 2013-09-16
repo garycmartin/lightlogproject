@@ -44,6 +44,7 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v4 ...
 ; v3 Fixed (maybe) bugs with for loops near max int
 ; v2 Corrected for full 64K
 ; v1 Kinda working
@@ -55,6 +56,7 @@
 ; - Test fill and read back full 64K eprom
 ; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
 
+#no_data ; <---- test this (programming should not zap eprom data)
 #picaxe 14m2
 
 init:
@@ -128,16 +130,18 @@ data_log:
         extra_byte = green_avg & %1100000000 / 64 + extra_byte
         extra_byte = blue_avg & %1100000000 / 16 + extra_byte
 
-        ; Write to eprom
-        hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
+        ; Write sample to eprom (FIXME: 4x255 padding is a quick fix for eof)
+        hi2cout i, (red_byte, green_byte, blue_byte, extra_byte, 255, 255, 255, 255)
 
-        ; Read it back in from eprom to test!
+        ; Read sample back in from eprom to test!
         ;pause 5
         ;hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
         ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
 
         ; Write position to eprom
         write 0, WORD i
+        ;read 0, WORD j
+        ;sertxd("Position ", #j, 13)
         ;hi2cout 0, (i1, i2)
         ;sertxd("Position ", #i, ", ", #i1, ", ", #i2, 13)
 
@@ -151,12 +155,16 @@ data_log:
 data_dump:
     ; Output eprom data
     sleep 4
-    read 0, WORD j
+    ;read 0, WORD j
+    ;sertxd("Samples ", #j, 13)
     ;hi2cin 0, (j1, j2)
     ;sertxd("Samples ", #j, ", ", #j1, ", ", #j2, 13)
-    for i = 2 to j step 4
-    ;for i = 0 to 65531 step 4
+    ;for i = 0 to j step 4
+    for i = 0 to 65531 step 4
         hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+        if red_byte = 255 and green_byte = 255 and blue_byte = 255 and extra_byte = 255 then
+            exit
+        endif
         sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
     next i
     end
