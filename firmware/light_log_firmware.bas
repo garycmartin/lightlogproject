@@ -44,17 +44,21 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
-; v4 ...
+; v5 ...
+; v4 Minor tinkering...
 ; v3 Fixed (maybe) bugs with for loops near max int
 ; v2 Corrected for full 64K
 ; v1 Kinda working
 ;
 ; TODO:
+; - LRDs should be powered up only when needed using an output pin
+; - Two serial coms for data download, log start time, device id, time step
+; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
 ; - Continue from last record after loss of power
 ; - When full, compress data 50% and double number of samples per average save
-; - Calculate and store sample varience
-; - Test fill and read back full 64K eprom
-; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
+; - Calculate and store average samples varience
+; - Test fill and read back full 64K eprom?
+; - Write an eprom memory test pattern?
 
 #no_data ; <---- test this (programming should not zap eprom data)
 #picaxe 14m2
@@ -92,86 +96,101 @@ init:
     readadc10 B.2, green_avg
     readadc10 B.5, blue_avg
 
+    ;goto dump_data
+    ;goto dump_all_data
+    ;goto erase_data
+
+    ; Count resets
+    read 2, WORD i
+    i = i + 1
+    write 2, WORD i
+    sleep 5
+    read 2, WORD i
+    sertxd("Reset counter: ", #i, 13)
+
+    ; Reset or continue recording from last save
+    ;i = 0
+    read 0, WORD i
+    hi2cout i, (255, 255, 255, 255)
+    i = i + 4
+
 main:
-    ; Datadump after a powercycle
-    ;goto data_dump
-    ;goto data_erase
+    ; Gather readings
+    pulsout C.0, 100
+    for j = 0 to 9 ; sample every 23sec (Wed 28 Sep 2013 12:18:43 BST reset count = 8)
+    ;for j = 0 to 90 ; sample every 3min 50sec (Wed 25 Sep 2013 01:46:56 reset count = 3)
+        readadc10 B.1, red
+        readadc10 B.2, green
+        readadc10 B.5, blue
 
-data_log:
-    for i = 0 to 65531 step 4
-        ; Gather readings
-        pulsout C.0, 100
-        for j = 0 to 9
-            readadc10 B.1, red
-            readadc10 B.2, green
-            readadc10 B.5, blue
+        ; Calculate rolling averages
+        red_avg = red_avg / 2
+        red_avg = red / 2 + red_avg
+        green_avg = green_avg / 2
+        green_avg = green / 2 + green_avg
+        blue_avg = blue_avg / 2
+        blue_avg = blue / 2 + blue_avg
 
-            ; Calculate rolling averages
-            red_avg = red_avg / 2
-            red_avg = red / 2 + red_avg
-            green_avg = green_avg / 2
-            green_avg = green / 2 + green_avg
-            blue_avg = blue_avg / 2
-            blue_avg = blue / 2 + blue_avg
+        ; Save some power
+        disablebod
+        sleep 1 ; 2.3sec per sample
+        enablebod
+    next j
 
-            ; Save some power
-            disablebod
-            sleep 1 ; 2.3sec per sample
-            enablebod
-        next j
+    ; Store least significant bytes
+    red_byte = red_avg & %11111111
+    green_byte = green_avg & %11111111
+    blue_byte = blue_avg & %11111111
 
-        ; Store least significant bytes
-        red_byte = red_avg & %11111111
-        green_byte = green_avg & %11111111
-        blue_byte = blue_avg & %11111111
+    ; Fill extra_byte with 10bit excess rgb bits
+    extra_byte = red_avg & %1100000000 / 256
+    extra_byte = green_avg & %1100000000 / 64 + extra_byte
+    extra_byte = blue_avg & %1100000000 / 16 + extra_byte
 
-        ; Fill extra_byte with 10bit excess rgb bits
-        extra_byte = red_avg & %1100000000 / 256
-        extra_byte = green_avg & %1100000000 / 64 + extra_byte
-        extra_byte = blue_avg & %1100000000 / 16 + extra_byte
+    ; Write sample to eprom
+    hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
 
-        ; Write sample to eprom (FIXME: 4x255 padding is a quick fix for eof)
-        hi2cout i, (red_byte, green_byte, blue_byte, extra_byte, 255, 255, 255, 255)
+    ; Read sample back in from eprom to test!
+    ;pause 5
+    ;hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+    ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
 
-        ; Read sample back in from eprom to test!
-        ;pause 5
-        ;hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
-        ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    ; Write position to eprom
+    write 0, WORD i
+    ;hi2cout 0, (i1, i2)
+    ;if i1 = 0 then
+    ;    sertxd("Position ", #i, 13)
+    ;    pulsout C.0, 100
+    ;endif
 
-        ; Write position to eprom
-        write 0, WORD i
-        ;read 0, WORD j
-        ;sertxd("Position ", #j, 13)
-        ;hi2cout 0, (i1, i2)
-        ;sertxd("Position ", #i, ", ", #i1, ", ", #i2, 13)
+    i = i + 4
+    goto main
 
-        ; Read it back in from eprom to test!
-        ;hi2cin 0, (j1, j2)
-        ;sertxd("Samples ", #j, ", ", #j1, ", ", #j2, 13)
-    next i
-
-    goto data_log
-
-data_dump:
+dump_data:
     ; Output eprom data
-    sleep 4
-    ;read 0, WORD j
+    sleep 5
+    read 0, WORD j
     ;sertxd("Samples ", #j, 13)
     ;hi2cin 0, (j1, j2)
     ;sertxd("Samples ", #j, ", ", #j1, ", ", #j2, 13)
-    ;for i = 0 to j step 4
-    for i = 0 to 65531 step 4
+    for i = 0 to j step 4
         hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
-        if red_byte = 255 and green_byte = 255 and blue_byte = 255 and extra_byte = 255 then
-            exit
-        endif
         sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
     next i
     end
 
-data_erase:
+dump_all_data:
+    ; Output all eprom data
+    sleep 5
+    for i = 0 to 65531 step 4
+        hi2cin i, (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    next i
+    end
+
+erase_data:
     ; Erase eprom data (help with debugging)
-    sleep 4
+    sleep 5
     sertxd("Erasing data ")
     for i = 0 to 65534
         hi2cout i, (255)
@@ -185,4 +204,8 @@ data_erase:
         endif
     next
     sertxd(13, "All data erased", 13)
+    for i = 0 to 30
+        pulsout C.0, 100
+        sleep 1
+    next
     end
