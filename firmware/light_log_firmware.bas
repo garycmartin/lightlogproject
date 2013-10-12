@@ -44,7 +44,9 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
-; v5 ...
+; v6 Continues from last record on loss of power
+;    Sensors VCC moved to C.4 allowing power down between samples
+; v5 Stuff... (debugging mainly)
 ; v4 Minor tinkering...
 ; v3 Fixed (maybe) bugs with for loops near max int
 ; v2 Corrected for full 64K
@@ -54,17 +56,19 @@
 ; - LRDs should be powered up only when needed using an output pin
 ; - Two serial coms for data download, log start time, device id, time step
 ; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
-; - Continue from last record after loss of power
 ; - When full, compress data 50% and double number of samples per average save
 ; - Calculate and store average samples varience
-; - Test fill and read back full 64K eprom?
-; - Write an eprom memory test pattern?
+; - reduce running freq, but boost for fastest data sync speeds (4800 too slow takes mins)
+; - send byte data rather than strings to improve data sync rate
+; - remove rolling average, just average clean data over each time slice
+; - Use calibadc/CALIBADC10 command and an ACD input to watch battery voltage Vpsu = 261 / Nref
+; - test/use time variable
 
 #no_data ; <---- test this (programming should not zap eprom data)
 #picaxe 14m2
 
 init:
-    ;setfreq m1
+    ;setfreq m1; k31, k250, k500, m1, m2, m4, m8, m16, m32
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
     symbol red = w0
@@ -91,6 +95,9 @@ init:
     ; LED off
     low C.0
 
+    ; Sensors off
+    low C.4
+
     ; Pre-fill rolling averages
     readadc10 B.1, red_avg
     readadc10 B.2, green_avg
@@ -98,30 +105,30 @@ init:
 
     ;goto dump_data
     ;goto dump_all_data
-    ;goto erase_data
+    ;goto erase_all_data
 
     ; Count resets
+    sleep 5
     read 2, WORD i
     i = i + 1
     write 2, WORD i
-    sleep 5
-    read 2, WORD i
     sertxd("Reset counter: ", #i, 13)
 
     ; Reset or continue recording from last save
-    ;i = 0
     read 0, WORD i
+    ;i = 0 ; reset back to start of mem
     hi2cout i, (255, 255, 255, 255)
     i = i + 4
 
 main:
-    ; Gather readings
     pulsout C.0, 100
-    for j = 0 to 9 ; sample every 23sec (Wed 28 Sep 2013 12:18:43 BST reset count = 8)
-    ;for j = 0 to 90 ; sample every 3min 50sec (Wed 25 Sep 2013 01:46:56 reset count = 3)
+    for j = 0 to 9 ; sample every 23sec (Fri 11 Oct 2013 01:32:22 BST reset count = 8, 64, 71)
+    ;for j = 0 to 99 ; sample every 230sec 50sec (Wed 2 Oct 2013 19:42:36 reset count = 22, 27, 33)
+        high C.4 ; Sensors on
         readadc10 B.1, red
         readadc10 B.2, green
         readadc10 B.5, blue
+        low C.4 ; Sensors off
 
         ; Calculate rolling averages
         red_avg = red_avg / 2
@@ -131,10 +138,14 @@ main:
         blue_avg = blue_avg / 2
         blue_avg = blue / 2 + blue_avg
 
+        ; Debug output
+        ;sertxd(#i, ":", #red_avg, ",", #green_avg, ",", #blue_avg, 13)
+
         ; Save some power
         disablebod
         sleep 1 ; 2.3sec per sample
-        enablebod
+        ;nap ; 0 to 14 for 18ms to 256sec?
+        enablebod ; 1.9V will trigger a reset on the 14M2
     next j
 
     ; Store least significant bytes
@@ -188,7 +199,7 @@ dump_all_data:
     next i
     end
 
-erase_data:
+erase_all_data:
     ; Erase eprom data (help with debugging)
     sleep 5
     sertxd("Erasing data ")
