@@ -44,6 +44,8 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v8 Fixed i2c fault at higher than m8 clock speeds
+;    Log data now dumped at m32 (with client connection at 38400 baud)
 ; v7 Improved avarages (no roll over between saved samples, more accurate)
 ;    Code cleanup
 ;    Added dump data and continue test routine
@@ -60,15 +62,12 @@
 ; v1 Kinda working
 ;
 ; TODO:
-; - Two serial coms for data download, log start time, device id, time step
-; - How should I trigger data dump? Sense serial connection? Serial signal from logging app?
+; - Use calibadc/CALIBADC10 command and an ACD input to watch battery voltage Vpsu = 261 / Nref
+; - Two way serial coms for data download protocol, log start time, device id, time step
 ; - When full, compress data 50% and double number of samples per average save
 ; - Calculate and store average samples varience (indication of activity?)
-; - reduce running freq, but boost for fastest data sync speeds (4800 too slow takes mins)
-; - send byte data rather than strings to improve data sync rate
-; - Use calibadc/CALIBADC10 command and an ACD input to watch battery voltage Vpsu = 261 / Nref
-; - test/use time variable <---- !!!!!!!!!!!!!!!!
-; - test blue data value, seems very low - turning out to be hard to test...
+; - Send byte data rather than strings to improve data sync rate
+; - Test/use time variable? <---- !!!!!!!!!!!!!!!!
 
 #no_data ; <---- test this (programming should not zap eprom data)
 #picaxe 14m2
@@ -117,11 +116,10 @@ init:
     low SENSOR_POWER
 
     ; Count reboots
-    read 2, WORD i
-    i = i + 1
-    write 2, WORD i
+    read 2, WORD k
+    k = k + 1
+    write 2, WORD k
     gosub flash_led
-    sertxd("Reset counter: ", #i, 13)
 
     ; Continue recording from last save and flag reboot
     read 0, WORD i
@@ -205,7 +203,9 @@ check_serial_and_delay:
     ;serrxd [2300, serial_checked], ("cmd"), ser_in_byte ; for 4Mhz operation
     serrxd [1150, serial_checked], ("cmd"), ser_in_byte
     if ser_in_byte = "a" then
-        sertxd("Hi!", 13) ; NOP
+        read 2, WORD k
+        sertxd("Reboot count: ", #k, 13)
+        sertxd("Mem pointer: ", #i, 13)
 
     elseif ser_in_byte = "b" then
         gosub dump_data_and_reset_pointer
@@ -214,7 +214,7 @@ check_serial_and_delay:
         gosub dump_data
 
     elseif ser_in_byte = "d" then
-        gosub dump_all_data
+        gosub dump_all_eprom_data
 
     elseif ser_in_byte = "e" then
         gosub reset_pointer
@@ -227,6 +227,7 @@ check_serial_and_delay:
     elseif ser_in_byte = "g" then
         sertxd("Erasing all data, reboot counter and pointer reset", 13)
         gosub erase_all_data
+        sertxd("Done", 13)
 
     else
         sertxd("Error ", #ser_in_byte, 13)
@@ -239,43 +240,59 @@ serial_checked:
 
 flash_led:
     ; Get some attention
-    for k = 0 to 10
-        pulsout LED, 100
+    for k = 0 to 20
+        pulsout LED, 75
         ;nap 5 ; 5 = 576ms
-        pause 100
+        pause 75
     next k
     return
 
 dump_data_and_reset_pointer:
-    ; Output eprom data
+    ; Output eprom data and reset pointer
     sleep 4
+    setfreq m32
+    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     read 0, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
     next k
+    sertxd("eof", 13)
     gosub reset_pointer
-    return
-
-dump_data:
-    ; Output eprom data
-    sleep 4
-    setfreq m4
-    read 0, WORD l
-    for k = 0 to l step 4
-        hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
-    next k
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     setfreq m2
     return
 
-dump_all_data:
+dump_data:
+    ; Debug output data
+    sleep 4
+    setfreq m32
+    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
+    read 0, WORD l
+    for k = 0 to l step 4
+        hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        ;sertxd (red_byte, green_byte, blue_byte, extra_byte, 13)
+        ;sertxd (red_byte, green_byte, blue_byte, extra_byte)
+    next k
+    sertxd("eof", 13)
+    ;sertxd("eof")
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+    setfreq m2
+    return
+
+dump_all_eprom_data:
     ; Debug output all eprom data
     sleep 4
+    setfreq m32
+    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65531 step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
     next k
+    sertxd("eof", 13)
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+    setfreq m2
     return
 
 reset_pointer:
@@ -291,10 +308,12 @@ reset_reboot_counter:
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
     setfreq m32
+    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65534
         hi2cout k, (255)
     next k
     gosub reset_pointer
     gosub reset_reboot_counter
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     setfreq m2
     return
