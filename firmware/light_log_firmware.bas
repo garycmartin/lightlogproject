@@ -44,6 +44,10 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v9 Converted data sync format from asci to raw bytes for speed
+;    Power saving tweaks, low speed, no brownout, no time, don't listen for prog
+;    Commands designed for realtime client software use (not human keyboarding)
+;    Less samples, longer gap between
 ; v8 Fixed i2c fault at higher than m8 clock speeds
 ;    Log data now dumped at m32 (with client connection at 38400 baud)
 ; v7 Improved avarages (no roll over between saved samples, more accurate)
@@ -62,19 +66,27 @@
 ; v1 Kinda working
 ;
 ; TODO:
-; - Use calibadc/CALIBADC10 command and an ACD input to watch battery voltage Vpsu = 261 / Nref
 ; - Two way serial coms for data download protocol, log start time, device id, time step
 ; - When full, compress data 50% and double number of samples per average save
 ; - Calculate and store average samples varience (indication of activity?)
-; - Send byte data rather than strings to improve data sync rate
 ; - Test/use time variable? <---- !!!!!!!!!!!!!!!!
+; - Use external RTC?
+; - Move B.1 for use of hardware serial in?
+; - If you are using occasional ADCs while on battery, turn off the ADC module
+;   between reads by poking the ADCON0 register ("poke $1f,value"). Bit0 of value
+;   turns it off, but the register should be read first so that other bits are preserved
+; - Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
+; - Current-limit any outputs to the degree possible. (e.g. LEDs)
 
-#no_data ; <---- test this (programming should not zap eprom data)
-#picaxe 14m2
+#no_data ; <---- test this (re-programming should not zap eprom data)
+#     14m2
 
 init:
-    setfreq m2; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    gosub low_speed
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+    disablebod
+    disabletime
+    ;disconnect ; Save power don't listen for programming (hard reset to program)
 
     symbol red = w0
     symbol green = w1
@@ -93,15 +105,16 @@ init:
     symbol extra_byte = b23
     symbol ser_in_byte = b24
     symbol flag = b25
+    symbol scratch = b26
 
-    ; 8 = 10 sample every 23sec (Tue 15 Oct 2013 04:08:54 BST reset count = 8, 64, 71, 79, 81, ??)
-    ; 98 = 100 sample every 230sec 50sec (Wed 2 Oct 2013 19:42:36 reset count = 22, 27, 33) <- 63 max!!
-    ; 62 = 64 sample every 147.2sec 50sec (Wed 16 Oct 2013 02:50:36 reset count = 22, 27, 33)
-    symbol SAMPLES_PER_AVERAGE = 8
+    ; 9 = 10 sample every 23sec (Tue 15 Oct 2013 04:08:54 BST reset count = 8, 64, 71, 79, 81, ??)
+    ; 99 = 100 sample every 230sec 50sec (Wed 2 Oct 2013 19:42:36 reset count = 22, 27, 33) <- 63 max!!
+    ; 63 = 64 sample every 147.2sec 50sec (Wed 16 Oct 2013 02:50:36 reset count = 22, 27, 33)
+    symbol SAMPLES_PER_AVERAGE = 5
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
-    symbol FLAG_FOO = %01000000
-    symbol FLAG_BAR = %10000000
+    symbol FLAG_BLOCKED = %01000000
+    symbol FLAG_FOO = %10000000
 
     symbol LED = C.0
     symbol SENSOR_POWER = C.4
@@ -126,32 +139,49 @@ init:
     flag = FLAG_REBOOT
 
 main:
-    ; Pre-fill rolling averages
-    high SENSOR_POWER ; Sensors on
-    readadc10 SENSOR_RED, red_avg
-    readadc10 SENSOR_GREEN, green_avg
-    readadc10 SENSOR_BLUE, blue_avg
-    low SENSOR_POWER ; Sensors off
-    gosub check_serial_and_delay
-    ;gosub low_power_and_delay
-
-    for j = 0 to SAMPLES_PER_AVERAGE
+    for j = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
-        readadc10 SENSOR_RED, red
-        readadc10 SENSOR_GREEN, green
-        readadc10 SENSOR_BLUE, blue
+        if j = 1 then
+            ; Pre-fill averages
+            readadc10 SENSOR_RED, red_avg
+            readadc10 SENSOR_GREEN, green_avg
+            readadc10 SENSOR_BLUE, blue_avg
+        else
+            readadc10 SENSOR_RED, red
+            readadc10 SENSOR_GREEN, green
+            readadc10 SENSOR_BLUE, blue
+
+            ; Debug serial output
+            ;gosub high_speed
+            ;sertxd("0: ", #red, ",", #green, ",", #blue, 13)
+            ;gosub low_speed
+
+            ;high LED
+
+            ;high SENSOR_POWER, SENSOR_GREEN, SENSOR_BLUE ; Sensors on
+            ;readadc10 SENSOR_RED, red
+            ;high SENSOR_RED
+            ;readadc10 SENSOR_GREEN, green
+            ;high SENSOR_GREEN
+            ;readadc10 SENSOR_BLUE, blue
+            ;low SENSOR_POWER, SENSOR_BLUE, SENSOR_GREEN, SENSOR_RED ; Sensors off
+
+            ;low LED
+
+            ; Debug serial output
+            ;gosub high_speed
+            ;sertxd("1: ", #red, ",", #green, ",", #blue, 13)
+            ;gosub low_speed
+
+            ; Accumulate data samples
+            red_avg = red + red_avg
+            green_avg = green + green_avg
+            blue_avg = blue + blue_avg
+        endif
         low SENSOR_POWER ; Sensors off
 
-        ; Debug serial output
-        ;sertxd(#red, ",", #green, ",", #blue, 13)
-
-        ; Accumulate data samples
-        red_avg = red + red_avg
-        green_avg = green + green_avg
-        blue_avg = blue + blue_avg
-
-        gosub check_serial_and_delay
-        ;gosub low_power_and_delay
+        gosub check_serial_comms
+        gosub low_power_and_delay
     next j
 
     ; Calculate averages
@@ -184,50 +214,58 @@ main:
     i = i + 4
 
     ; I'm still alive!
-    pulsout LED, 100
+    ; <----- should sample, sample while on, and sample again to spot occlusion
+    ; <----- could avoid led on if first sample is within some % of previous sample
+    high LED
+    nap 1 ; 72ms
+    low LED
 
     goto main
 
 low_power_and_delay:
-    ; Save some power while napping
-    disablebod
-    disabletime
-    nap 7 ; 0 to 14 for 18ms to 256sec, 7 = 2.3sec, 12 = 64sec (2-3hr drift over 1 day)
-    enabletime
-    ;pause 2300 ; <--- much more accurate but takes more power and affected by freq
-    enablebod ; 1.9V will trigger a reset on the 14M2
+    ; Save power and sleep
+    sleep 2 ; 1 = 2.3sec watchdog timer
     return
 
-check_serial_and_delay:
-    disconnect
-    ;serrxd [2300, serial_checked], ("cmd"), ser_in_byte ; for 4Mhz operation
-    serrxd [1150, serial_checked], ("cmd"), ser_in_byte
+check_serial_comms:
+    gosub high_speed
+    ;disconnect
+    sertxd("Hello?")
+    serrxd [100, serial_checked], ser_in_byte
+    ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
+    ;serrxd ser_in_byte
+    high LED
+    nap 1 ; 72ms
+    low LED
+
     if ser_in_byte = "a" then
-        read 2, WORD k
-        sertxd("Reboot count: ", #k, 13)
-        sertxd("Mem pointer: ", #i, 13)
+        gosub display_status
+        gosub flash_led
 
     elseif ser_in_byte = "b" then
+        ;sertxd("Dumping data and resetting pointer", 13)
         gosub dump_data_and_reset_pointer
 
     elseif ser_in_byte = "c" then
+        ;sertxd("Dumping data", 13)
         gosub dump_data
 
     elseif ser_in_byte = "d" then
+        ;sertxd("Dumping all eprom data", 13)
         gosub dump_all_eprom_data
 
     elseif ser_in_byte = "e" then
         gosub reset_pointer
-        sertxd("Pointer reset", 13)
+        ;sertxd("Pointer reset", 13)
 
     elseif ser_in_byte = "f" then
         gosub reset_reboot_counter
-        sertxd("Zero reboot counter", 13)
+        ;sertxd("Zero reboot counter", 13)
 
     elseif ser_in_byte = "g" then
-        sertxd("Erasing all data, reboot counter and pointer reset", 13)
+        ;sertxd("Erasing data, reboot counter & pointer", 13)
         gosub erase_all_data
-        sertxd("Done", 13)
+        ;sertxd("Done", 13)
 
     else
         sertxd("Error ", #ser_in_byte, 13)
@@ -235,64 +273,63 @@ check_serial_and_delay:
     endif
 
 serial_checked:
-    reconnect
+    ;reconnect
+    gosub low_speed
     return
 
 flash_led:
     ; Get some attention
     for k = 0 to 20
-        pulsout LED, 75
-        ;nap 5 ; 5 = 576ms
-        pause 75
+        high LED
+        nap 1
+        low LED
+        nap 2 ; 72ms
     next k
+    return
+
+display_status:
+    read 2, WORD k
+    sertxd("Reboot count: ", #k, 13)
+    sertxd("Mem pointer: ", #i, 13)
+    calibadc10 k
+    l = 52378 / k * 2
+    sertxd("Batt: ", #l, "0mV", 13)
     return
 
 dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
-    sleep 4
-    setfreq m32
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     read 0, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        sertxd (red_byte, green_byte, blue_byte, extra_byte)
     next k
-    sertxd("eof", 13)
+    sertxd("eof")
     gosub reset_pointer
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
-    setfreq m2
     return
 
 dump_data:
     ; Debug output data
-    sleep 4
-    setfreq m32
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     read 0, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
-        ;sertxd (red_byte, green_byte, blue_byte, extra_byte, 13)
-        ;sertxd (red_byte, green_byte, blue_byte, extra_byte)
+        sertxd (red_byte, green_byte, blue_byte, extra_byte)
     next k
-    sertxd("eof", 13)
-    ;sertxd("eof")
+    sertxd("eof")
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
-    setfreq m2
     return
 
 dump_all_eprom_data:
     ; Debug output all eprom data
-    sleep 4
-    setfreq m32
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65531 step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        sertxd (red_byte, green_byte, blue_byte, extra_byte)
     next k
-    sertxd("eof", 13)
+    sertxd("eof")
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
-    setfreq m2
     return
 
 reset_pointer:
@@ -307,7 +344,6 @@ reset_reboot_counter:
 
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
-    setfreq m32
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65534
         hi2cout k, (255)
@@ -315,5 +351,12 @@ erase_all_data:
     gosub reset_pointer
     gosub reset_reboot_counter
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
-    setfreq m2
+    return
+
+high_speed:
+    setfreq m32; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    return
+
+low_speed:
+    setfreq k500; k31, k250, k500, m1, m2, m4, m8, m16, m32
     return
