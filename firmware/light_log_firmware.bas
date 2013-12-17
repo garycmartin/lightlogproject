@@ -44,26 +44,28 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
-; v9 Converted data sync format from asci to raw bytes for speed
-;    Power saving tweaks, low speed, no brownout, no time, don't listen for prog
-;    Commands designed for realtime client software use (not human keyboarding)
-;    Less samples, longer gap between
-; v8 Fixed i2c fault at higher than m8 clock speeds
-;    Log data now dumped at m32 (with client connection at 38400 baud)
-; v7 Improved avarages (no roll over between saved samples, more accurate)
-;    Code cleanup
-;    Added dump data and continue test routine
-;    Added serial cmd commands
-;    Dropped to 2Mhz = serial 2400bps (any slower seems to make serial io flakey)
-;    Replaced 255,255,255,255 reboot with extra_byte 2-bit flag in data
-;    High speed erase (should do this for data sync next)
-; v6 Continues from last record on loss of power
-;    Sensors VCC moved to C.4 allowing power down between samples
-; v5 Stuff... (debugging mainly)
-; v4 Minor tinkering...
-; v3 Fixed (maybe) bugs with for loops near max int
-; v2 Corrected for full 64K
-; v1 Kinda working
+; v10 Testing for back reflection from LED to indicate sensors are blocked
+;     Serial ping 'Hello?' to trigger remote sync if connected
+; v9  Converted data sync format from asci to raw bytes for speed
+;     Power saving tweaks, low speed, no brownout, no time, don't listen for prog
+;     Commands designed for realtime client software use (not human keyboarding)
+;     Less samples, longer gap between
+; v8  Fixed i2c fault at higher than m8 clock speeds
+;     Log data now dumped at m32 (with client connection at 38400 baud)
+; v7  Improved avarages (no roll over between saved samples, more accurate)
+;     Code cleanup
+;     Added dump data and continue test routine
+;     Added serial cmd commands
+;     Dropped to 2Mhz = serial 2400bps (any slower seems to make serial io flakey)
+;     Replaced 255,255,255,255 reboot with extra_byte 2-bit flag in data
+;     High speed erase (should do this for data sync next)
+; v6  Continues from last record on loss of power
+;     Sensors VCC moved to C.4 allowing power down between samples
+; v5  Stuff... (debugging mainly)
+; v4  Minor tinkering...
+; v3  Fixed (maybe) bugs with for loops near max int
+; v2  Corrected for full 64K
+; v1  Kinda working
 ;
 ; TODO:
 ; - Two way serial coms for data download protocol, log start time, device id, time step
@@ -79,7 +81,7 @@
 ; - Current-limit any outputs to the degree possible. (e.g. LEDs)
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
-#     14m2
+#picaxe 14m2
 
 init:
     gosub low_speed
@@ -143,10 +145,18 @@ main:
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages
+            high LED
+            readadc10 SENSOR_RED, k
+            low LED
+            readadc10 SENSOR_RED, l
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
         else
+            high LED
+            readadc10 SENSOR_RED, k
+            low LED
+            readadc10 SENSOR_RED, l
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -156,29 +166,17 @@ main:
             ;sertxd("0: ", #red, ",", #green, ",", #blue, 13)
             ;gosub low_speed
 
-            ;high LED
-
-            ;high SENSOR_POWER, SENSOR_GREEN, SENSOR_BLUE ; Sensors on
-            ;readadc10 SENSOR_RED, red
-            ;high SENSOR_RED
-            ;readadc10 SENSOR_GREEN, green
-            ;high SENSOR_GREEN
-            ;readadc10 SENSOR_BLUE, blue
-            ;low SENSOR_POWER, SENSOR_BLUE, SENSOR_GREEN, SENSOR_RED ; Sensors off
-
-            ;low LED
-
-            ; Debug serial output
-            ;gosub high_speed
-            ;sertxd("1: ", #red, ",", #green, ",", #blue, 13)
-            ;gosub low_speed
-
             ; Accumulate data samples
             red_avg = red + red_avg
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
         endif
         low SENSOR_POWER ; Sensors off
+
+        k = k * 10 / 15 ; reduce by 66%
+        if k > l then
+            flag = FLAG_BLOCKED
+        endif
 
         gosub check_serial_comms
         gosub low_power_and_delay
