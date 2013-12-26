@@ -44,6 +44,9 @@
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v11 Fixed light block test
+;     Light led only when it gets darker than average
+;     Light led if previous result was "blocked", light it 3 times to tripple check
 ; v10 Testing for back reflection from LED to indicate sensors are blocked
 ;     Serial ping 'Hello?' to trigger remote sync if connected
 ; v9  Converted data sync format from asci to raw bytes for speed
@@ -68,17 +71,13 @@
 ; v1  Kinda working
 ;
 ; TODO:
+; - When full, compress data 50% and double number of samples per average and continue
 ; - Two way serial coms for data download protocol, log start time, device id, time step
-; - When full, compress data 50% and double number of samples per average save
 ; - Calculate and store average samples varience (indication of activity?)
-; - Test/use time variable? <---- !!!!!!!!!!!!!!!!
-; - Use external RTC?
-; - Move B.1 for use of hardware serial in?
-; - If you are using occasional ADCs while on battery, turn off the ADC module
-;   between reads by poking the ADCON0 register ("poke $1f,value"). Bit0 of value
-;   turns it off, but the register should be read first so that other bits are preserved
-; - Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
-; - Current-limit any outputs to the degree possible. (e.g. LEDs)
+; - HW: Use external RTC?
+; - HW: Move B.1 for use of hardware serial in?
+; - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
+; - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
@@ -88,7 +87,7 @@ init:
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     disablebod
     disabletime
-    ;disconnect ; Save power don't listen for programming (hard reset to program)
+    disconnect
 
     symbol red = w0
     symbol green = w1
@@ -108,6 +107,7 @@ init:
     symbol ser_in_byte = b24
     symbol flag = b25
     symbol scratch = b26
+    symbol blocked = b27
 
     ; 9 = 10 sample every 23sec (Tue 15 Oct 2013 04:08:54 BST reset count = 8, 64, 71, 79, 81, ??)
     ; 99 = 100 sample every 230sec 50sec (Wed 2 Oct 2013 19:42:36 reset count = 22, 27, 33) <- 63 max!!
@@ -134,29 +134,54 @@ init:
     read 2, WORD k
     k = k + 1
     write 2, WORD k
+
     gosub flash_led
+    gosub display_status
 
     ; Continue recording from last save and flag reboot
     read 0, WORD i
     flag = FLAG_REBOOT
+
+    ; Three flashes of led on re-boot to test for obstruction
+    blocked = 3
 
 main:
     for j = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages
-            high LED
-            readadc10 SENSOR_RED, k
-            low LED
             readadc10 SENSOR_RED, l
+            k = l * j
+            if k <= red_avg or blocked > 0 then
+                high LED
+                nap 1
+                readadc10 SENSOR_RED, k
+                low LED
+                nap 1
+            else
+                k = l
+                low LED
+                low LED
+                nap 2
+            endif
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
         else
-            high LED
-            readadc10 SENSOR_RED, k
-            low LED
             readadc10 SENSOR_RED, l
+            k = l * j
+            if k <= red_avg or blocked > 0 then
+                high LED
+                nap 1
+                readadc10 SENSOR_RED, k
+                low LED
+                nap 1
+            else
+                k = l
+                low LED
+                low LED
+                nap 2
+            endif
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -173,9 +198,27 @@ main:
         endif
         low SENSOR_POWER ; Sensors off
 
-        k = k * 10 / 15 ; reduce by 66%
-        if k > l then
-            flag = FLAG_BLOCKED
+        ; Debug blocked output
+        ;gosub high_speed
+        ;sertxd(#k, ", ", #l, ", ", #red, 13)
+        ;gosub low_speed
+
+        if k > 3 then
+            k = k - 3
+        else
+            k = 0
+        endif
+        if k > l and k > red then
+            flag = FLAG_BLOCKED ; <--- TODO: combine with poss existing flag val
+            blocked = 3 ; re-test 3 times after long sequential block
+            ; Debug blocked output
+            ;gosub high_speed
+            ;sertxd("BLOCKED", 13)
+            ;gosub low_speed
+        else
+            if blocked > 0 then
+                dec blocked
+            endif
         endif
 
         gosub check_serial_comms
@@ -199,7 +242,7 @@ main:
 
     ; Use extra_byte's 2 unsed bits for signaling
     extra_byte = extra_byte + flag
-    flag = FLAG_OK
+    flag = FLAG_OK ; Clear any flag states
 
     ; Write data to eprom
     hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
@@ -212,11 +255,9 @@ main:
     i = i + 4
 
     ; I'm still alive!
-    ; <----- should sample, sample while on, and sample again to spot occlusion
-    ; <----- could avoid led on if first sample is within some % of previous sample
-    high LED
-    nap 1 ; 72ms
-    low LED
+    ;high LED
+    ;nap 1 ; 72ms
+    ;low LED
 
     goto main
 
@@ -232,9 +273,6 @@ check_serial_comms:
     serrxd [100, serial_checked], ser_in_byte
     ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
     ;serrxd ser_in_byte
-    high LED
-    nap 1 ; 72ms
-    low LED
 
     if ser_in_byte = "a" then
         gosub display_status
@@ -277,7 +315,7 @@ serial_checked:
 
 flash_led:
     ; Get some attention
-    for k = 0 to 20
+    for k = 1 to 20
         high LED
         nap 1
         low LED
