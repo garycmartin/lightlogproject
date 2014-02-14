@@ -37,13 +37,15 @@
 ;                                  _____
 ;                             +V -|1 ^14|- 0V
 ;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
-;                            C.4 -|3  12|- B.1 Red ADC
+;             Sensors enable C.4 -|3  12|- B.1 Red ADC
 ;                            C.3 -|4  11|- B.2 Green ADC
 ;                            C.2 -|5  10|- B.3 hi2c scl
 ;                            C.1 -|6   9|- B.4 hi2c sda
 ;                        LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v12 Used for bread board with 281sec step (63 samples per record, 9th/Feb/2014 17:26)
+;     Don't flash led when getting status (looks like a reboot)
 ; v11 Fixed light block test
 ;     Light led only when it gets darker than average
 ;     Light led if previous result was "blocked", light it 3 times to tripple check
@@ -73,7 +75,7 @@
 ; TODO:
 ; - When full, compress data 50% and double number of samples per average and continue
 ; - Two way serial coms for data download protocol, log start time, device id, time step
-; - Calculate and store average samples varience (indication of activity?)
+; - Calculate and store average samples varience (indication of activity)?
 ; - HW: Use external RTC?
 ; - HW: Move B.1 for use of hardware serial in?
 ; - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
@@ -109,9 +111,8 @@ init:
     symbol scratch = b26
     symbol blocked = b27
 
-    ; 9 = 10 sample every 23sec (Tue 15 Oct 2013 04:08:54 BST reset count = 8, 64, 71, 79, 81, ??)
-    ; 99 = 100 sample every 230sec 50sec (Wed 2 Oct 2013 19:42:36 reset count = 22, 27, 33) <- 63 max!!
-    ; 63 = 64 sample every 147.2sec 50sec (Wed 16 Oct 2013 02:50:36 reset count = 22, 27, 33)
+    ; 63 = max (due to word int maths)
+    ; 5 = default
     symbol SAMPLES_PER_AVERAGE = 5
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
@@ -130,7 +131,7 @@ init:
     ; Sensors off
     low SENSOR_POWER
 
-    ; Count reboots
+    ; Count device reboots
     read 2, WORD k
     k = k + 1
     write 2, WORD k
@@ -149,7 +150,7 @@ main:
     for j = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
         if j = 1 then
-            ; Pre-fill averages
+            ; Pre-fill averages for first pass
             readadc10 SENSOR_RED, l
             k = l * j
             if k <= red_avg or blocked > 0 then
@@ -168,6 +169,7 @@ main:
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
         else
+            ; Accumulate average data samples
             readadc10 SENSOR_RED, l
             k = l * j
             if k <= red_avg or blocked > 0 then
@@ -185,16 +187,15 @@ main:
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
+            red_avg = red + red_avg
+            green_avg = green + green_avg
+            blue_avg = blue + blue_avg
 
             ; Debug serial output
             ;gosub high_speed
             ;sertxd("0: ", #red, ",", #green, ",", #blue, 13)
             ;gosub low_speed
 
-            ; Accumulate data samples
-            red_avg = red + red_avg
-            green_avg = green + green_avg
-            blue_avg = blue + blue_avg
         endif
         low SENSOR_POWER ; Sensors off
 
@@ -248,16 +249,13 @@ main:
     hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
 
     ; Debug serial output
-    ;sertxd(#red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    ;gosub high_speed
+    ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+    ;gosub low_speed
 
     ; Write current position to micro's eprom and increment
     write 0, WORD i
     i = i + 4
-
-    ; I'm still alive!
-    ;high LED
-    ;nap 1 ; 72ms
-    ;low LED
 
     goto main
 
@@ -276,32 +274,30 @@ check_serial_comms:
 
     if ser_in_byte = "a" then
         gosub display_status
-        gosub flash_led
 
     elseif ser_in_byte = "b" then
-        ;sertxd("Dumping data and resetting pointer", 13)
+        ; Dump data and resetting pointer
         gosub dump_data_and_reset_pointer
 
     elseif ser_in_byte = "c" then
-        ;sertxd("Dumping data", 13)
+        ; Dump data
         gosub dump_data
 
     elseif ser_in_byte = "d" then
-        ;sertxd("Dumping all eprom data", 13)
+        ; Dump all eprom data
         gosub dump_all_eprom_data
 
     elseif ser_in_byte = "e" then
         gosub reset_pointer
-        ;sertxd("Pointer reset", 13)
+        ; Pointer reset
 
     elseif ser_in_byte = "f" then
         gosub reset_reboot_counter
-        ;sertxd("Zero reboot counter", 13)
+        ; Zero reboot counter
 
     elseif ser_in_byte = "g" then
-        ;sertxd("Erasing data, reboot counter & pointer", 13)
+        ; Erase data, reboot counter & pointer"
         gosub erase_all_data
-        ;sertxd("Done", 13)
 
     else
         sertxd("Error ", #ser_in_byte, 13)
