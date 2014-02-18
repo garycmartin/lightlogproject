@@ -38,12 +38,15 @@
 ;                             +V -|1 ^14|- 0V
 ;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
 ;             Sensors enable C.4 -|3  12|- B.1 Red ADC
-;                            C.3 -|4  11|- B.2 Green ADC
+;                (Button->>) C.3 -|4  11|- B.2 Green ADC
 ;                            C.2 -|5  10|- B.3 hi2c scl
-;                            C.1 -|6   9|- B.4 hi2c sda
-;                        LED C.0 -|7   8|- B.5 Blue ADC
+;                   (LED->>) C.1 -|6   9|- B.4 hi2c sda
+;         (Clear ADC->>) LED C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v13 Remove duplicate code blocks in sensor read cycle
+;     Added firmware version to device status
+;     Code clean-up
 ; v12 Used for bread board with 281sec step (63 samples per record, 9th/Feb/2014 17:26)
 ;     Don't flash led when getting status (looks like a reboot)
 ; v11 Fixed light block test
@@ -74,22 +77,50 @@
 ;
 ; TODO:
 ; - When full, compress data 50% and double number of samples per average and continue
-; - Two way serial coms for data download protocol, log start time, device id, time step
+; - Extend two way serial protocol:
+;   - log start time (and transmit it during sync)
+;   - generate device id for first boot (and transmit it during sync)
+;   - report hardware version in status? (store in picaxe rom, defined during hw test)
+;   - add a validate/checksum to sync process
 ; - Calculate and store average samples varience (indication of activity)?
 ; - HW: Use external RTC?
 ; - HW: Move B.1 for use of hardware serial in?
 ; - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
 ; - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
+; - Use a button to interrupt, short press for marker, long hold for reboot
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
+;#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
+;#define DEBUG_SENSORS ; Simple sensor debug output
 
 init:
+    ; Save all the power we can
     gosub low_speed
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     disablebod
     disabletime
     disconnect
+
+    ; I2C setup
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+
+    symbol FIRMWARE_VERSION = 13
+
+    symbol LED = C.0
+    symbol SENSOR_POWER = C.4
+    symbol SENSOR_RED = B.1
+    symbol SENSOR_GREEN = B.2
+    symbol SENSOR_BLUE = B.5
+
+    ; 5 = default, 63 = max (due to word int maths and avg)
+    symbol SAMPLES_PER_AVERAGE = 5
+
+    ; TODO: Check these realy work as expected and don't just point to pins!...
+    ; use #define instead?
+    symbol FLAG_OK = %00000000
+    symbol FLAG_REBOOT = %11000000
+    symbol FLAG_BLOCKED = %01000000
+    symbol FLAG_TBA = %10000000
 
     symbol red = w0
     symbol green = w1
@@ -111,35 +142,17 @@ init:
     symbol scratch = b26
     symbol blocked = b27
 
-    ; 63 = max (due to word int maths)
-    ; 5 = default
-    symbol SAMPLES_PER_AVERAGE = 5
-    symbol FLAG_OK = %00000000
-    symbol FLAG_REBOOT = %11000000
-    symbol FLAG_BLOCKED = %01000000
-    symbol FLAG_FOO = %10000000
-
-    symbol LED = C.0
-    symbol SENSOR_POWER = C.4
-    symbol SENSOR_RED = B.1
-    symbol SENSOR_GREEN = B.2
-    symbol SENSOR_BLUE = B.5
-
-    ; LED off
+    ; LED and sensors off
     low LED
-
-    ; Sensors off
     low SENSOR_POWER
 
-    ; Count device reboots
+    ; Keep a count of device reboots
     read 2, WORD k
     k = k + 1
     write 2, WORD k
-
     gosub flash_led
-    gosub display_status
 
-    ; Continue recording from last save and flag reboot
+    ; Continue recording from last save and the flag reboot
     read 0, WORD i
     flag = FLAG_REBOOT
 
@@ -151,39 +164,13 @@ main:
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages for first pass
-            readadc10 SENSOR_RED, l
-            k = l * j
-            if k <= red_avg or blocked > 0 then
-                high LED
-                nap 1
-                readadc10 SENSOR_RED, k
-                low LED
-                nap 1
-            else
-                k = l
-                low LED
-                low LED
-                nap 2
-            endif
+            gosub sensor_read_cycle
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
         else
             ; Accumulate average data samples
-            readadc10 SENSOR_RED, l
-            k = l * j
-            if k <= red_avg or blocked > 0 then
-                high LED
-                nap 1
-                readadc10 SENSOR_RED, k
-                low LED
-                nap 1
-            else
-                k = l
-                low LED
-                low LED
-                nap 2
-            endif
+            gosub sensor_read_cycle
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -191,18 +178,22 @@ main:
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
 
-            ; Debug serial output
-            ;gosub high_speed
-            ;sertxd("0: ", #red, ",", #green, ",", #blue, 13)
-            ;gosub low_speed
+            ; Debug blocked output
+            #ifdef DEBUG_BLOCKED
+                gosub high_speed
+                sertxd("0: ", #red, ",", #green, ",", #blue, 13)
+                gosub low_speed
+            #endif
 
         endif
         low SENSOR_POWER ; Sensors off
 
         ; Debug blocked output
-        ;gosub high_speed
-        ;sertxd(#k, ", ", #l, ", ", #red, 13)
-        ;gosub low_speed
+        #ifdef DEBUG_BLOCKED
+            gosub high_speed
+            sertxd("Sensor LED reflection: ", #k, ", ", #l, ", ", #red, 13)
+            gosub low_speed
+        #endif
 
         if k > 3 then
             k = k - 3
@@ -212,10 +203,13 @@ main:
         if k > l and k > red then
             flag = FLAG_BLOCKED ; <--- TODO: combine with poss existing flag val
             blocked = 3 ; re-test 3 times after long sequential block
-            ; Debug blocked output
-            ;gosub high_speed
-            ;sertxd("BLOCKED", 13)
-            ;gosub low_speed
+
+            ; Debug blocked sensor output
+            #ifdef DEBUG_BLOCKED
+                gosub high_speed
+                sertxd("BLOCKED", 13)
+                gosub low_speed
+            #endif
         else
             if blocked > 0 then
                 dec blocked
@@ -248,16 +242,35 @@ main:
     ; Write data to eprom
     hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
 
-    ; Debug serial output
-    ;gosub high_speed
-    ;sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
-    ;gosub low_speed
+    ; Debug sensor output
+    #ifdef DEBUG_SENSORS
+        gosub high_speed
+        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        gosub low_speed
+    #endif
 
-    ; Write current position to micro's eprom and increment
+    ; Write position to micro eprom and increment (mem bytes = 65536 = word)
     write 0, WORD i
     i = i + 4
 
     goto main
+
+sensor_read_cycle:
+    readadc10 SENSOR_RED, l
+    k = l * j
+    if k <= red_avg or blocked > 0 then
+        high LED
+        nap 1
+        readadc10 SENSOR_RED, k
+        low LED
+        nap 1
+    else
+        k = l
+        low LED
+        low LED
+        nap 2
+    endif
+    return
 
 low_power_and_delay:
     ; Save power and sleep
@@ -266,7 +279,6 @@ low_power_and_delay:
 
 check_serial_comms:
     gosub high_speed
-    ;disconnect
     sertxd("Hello?")
     serrxd [100, serial_checked], ser_in_byte
     ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
@@ -276,27 +288,21 @@ check_serial_comms:
         gosub display_status
 
     elseif ser_in_byte = "b" then
-        ; Dump data and resetting pointer
         gosub dump_data_and_reset_pointer
 
     elseif ser_in_byte = "c" then
-        ; Dump data
         gosub dump_data
 
     elseif ser_in_byte = "d" then
-        ; Dump all eprom data
         gosub dump_all_eprom_data
 
     elseif ser_in_byte = "e" then
         gosub reset_pointer
-        ; Pointer reset
 
     elseif ser_in_byte = "f" then
         gosub reset_reboot_counter
-        ; Zero reboot counter
 
     elseif ser_in_byte = "g" then
-        ; Erase data, reboot counter & pointer"
         gosub erase_all_data
 
     else
@@ -305,7 +311,6 @@ check_serial_comms:
     endif
 
 serial_checked:
-    ;reconnect
     gosub low_speed
     return
 
@@ -321,11 +326,12 @@ flash_led:
 
 display_status:
     read 2, WORD k
-    sertxd("Reboot count: ", #k, 13)
-    sertxd("Mem pointer: ", #i, 13)
+    sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
+    sertxd("Device reboot count: ", #k, 13)
+    sertxd("Mem pointer: ", #i, "/65536", 13)
     calibadc10 k
     l = 52378 / k * 2
-    sertxd("Batt: ", #l, "0mV", 13)
+    sertxd("Batttey: ", #l, "0mV", 13)
     return
 
 dump_data_and_reset_pointer:
