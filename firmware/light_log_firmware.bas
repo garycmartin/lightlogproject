@@ -38,13 +38,19 @@
 ;                             +V -|1 ^14|- 0V
 ;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
 ;             Sensors enable C.4 -|3  12|- B.1 Red ADC
-;                (Button->>) C.3 -|4  11|- B.2 Green ADC
+;                     Button C.3 -|4  11|- B.2 Green ADC
 ;                            C.2 -|5  10|- B.3 hi2c scl
-;                   (LED->>) C.1 -|6   9|- B.4 hi2c sda
-;         (Clear ADC->>) LED C.0 -|7   8|- B.5 Blue ADC
+;                        LED C.1 -|6   9|- B.4 hi2c sda
+;                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
-; v13 Remove duplicate code blocks in sensor read cycle
+; v14 ****** HARDWARE v0.5 RED FLAG incompatibility *******
+;     C.1 for LED output
+;     C.0 for Clear LDR input
+;     C.3 for Button
+;     Improved debugging output options
+; v13 Last v0.4 hardware compatible version (for original large pendant)
+;     Remove duplicate code blocks in sensor read cycle
 ;     Added firmware version to device status
 ;     Code clean-up
 ; v12 Used for bread board with 281sec step (63 samples per record, 9th/Feb/2014 17:26)
@@ -76,11 +82,12 @@
 ; v1  Kinda working
 ;
 ; TODO:
+; - Add code for clear LDR sensor
 ; - When full, compress data 50% and double number of samples per average and continue
 ; - Extend two way serial protocol:
 ;   - log start time (and transmit it during sync)
 ;   - generate device id for first boot (and transmit it during sync)
-;   - report hardware version in status? (store in picaxe rom, defined during hw test)
+;   - report hardware version in status (store in picaxe rom, defined during first run)
 ;   - add a validate/checksum to sync process
 ; - Calculate and store average samples varience (indication of activity)?
 ; - HW: Use external RTC?
@@ -91,8 +98,9 @@
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
-;#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
-;#define DEBUG_SENSORS ; Simple sensor debug output
+#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
+#define DEBUG_SENSORS ; Debug output for sensor data
+#define DEBUG_WRITE ; Debug output for data written to eprom
 
 init:
     ; Save all the power we can
@@ -104,19 +112,21 @@ init:
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
-    symbol FIRMWARE_VERSION = 13
+    symbol FIRMWARE_VERSION = 14
 
-    symbol LED = C.0
+    symbol LED = C.1
     symbol SENSOR_POWER = C.4
     symbol SENSOR_RED = B.1
     symbol SENSOR_GREEN = B.2
     symbol SENSOR_BLUE = B.5
+    symbol SENSOR_CLEAR = C.0
+    symbol EVENT_BUTTON = C.3
 
     ; 5 = default, 63 = max (due to word int maths and avg)
     symbol SAMPLES_PER_AVERAGE = 5
 
-    ; TODO: Check these realy work as expected and don't just point to pins!...
-    ; use #define instead?
+    ; TODO: Check these realy work as expected and don't just point to pins!!!!!
+    ;       Use #define instead if this is a bug?
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
     symbol FLAG_BLOCKED = %01000000
@@ -164,13 +174,13 @@ main:
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages for first pass
-            gosub sensor_read_cycle
+            gosub sensor_blocked_check
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
         else
             ; Accumulate average data samples
-            gosub sensor_read_cycle
+            gosub sensor_blocked_check
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -179,9 +189,9 @@ main:
             blue_avg = blue + blue_avg
 
             ; Debug blocked output
-            #ifdef DEBUG_BLOCKED
+            #ifdef DEBUG_SENSORS
                 gosub high_speed
-                sertxd("0: ", #red, ",", #green, ",", #blue, 13)
+                sertxd("Sensors: R", #red, ", G", #green, ", B", #blue, 13)
                 gosub low_speed
             #endif
 
@@ -191,7 +201,7 @@ main:
         ; Debug blocked output
         #ifdef DEBUG_BLOCKED
             gosub high_speed
-            sertxd("Sensor LED reflection: ", #k, ", ", #l, ", ", #red, 13)
+            sertxd("LED back reflection: K", #k, ", L", #l, 13)
             gosub low_speed
         #endif
 
@@ -207,7 +217,7 @@ main:
             ; Debug blocked sensor output
             #ifdef DEBUG_BLOCKED
                 gosub high_speed
-                sertxd("BLOCKED", 13)
+                sertxd("Sensors blocked!", 13)
                 gosub low_speed
             #endif
         else
@@ -243,9 +253,9 @@ main:
     hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
 
     ; Debug sensor output
-    #ifdef DEBUG_SENSORS
+    #ifdef DEBUG_WRITE
         gosub high_speed
-        sertxd(#i, ":", #red_byte, ",", #green_byte, ",", #blue_byte, ",", #extra_byte, 13)
+        sertxd("Write to ", #i, ", R", #red_byte, ", G", #green_byte, ", B", #blue_byte, ", E", #extra_byte, 13)
         gosub low_speed
     #endif
 
@@ -255,7 +265,8 @@ main:
 
     goto main
 
-sensor_read_cycle:
+sensor_blocked_check:
+    ; TODO: Read from the clear sensor for maximum sensitivity
     readadc10 SENSOR_RED, l
     k = l * j
     if k <= red_avg or blocked > 0 then
