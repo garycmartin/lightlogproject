@@ -44,6 +44,11 @@
 ;                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v15 Extended block debugging output
+;     Tweaked magic number for back reflection (can I auto calibrate this?)
+;     Longer naps after led flash to reduce sensor ghost response
+;     Using nap 0 (18ms) for led flash duration
+;     Only flashes one more time after a block (used to be 3)
 ; v14 ****** HARDWARE v0.5 RED FLAG incompatibility *******
 ;     C.1 for LED output
 ;     C.0 for Clear LDR input
@@ -82,6 +87,7 @@
 ; v1  Kinda working
 ;
 ; TODO:
+; - Can I software calibrate the case led reflection value (for various case designs)?
 ; - Add code for clear LDR sensor
 ; - When full, compress data 50% and double number of samples per average and continue
 ; - Extend two way serial protocol:
@@ -112,7 +118,7 @@ init:
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
-    symbol FIRMWARE_VERSION = 14
+    symbol FIRMWARE_VERSION = 15
 
     symbol LED = C.1
     symbol SENSOR_POWER = C.4
@@ -166,8 +172,8 @@ init:
     read 0, WORD i
     flag = FLAG_REBOOT
 
-    ; Three flashes of led on re-boot to test for obstruction
-    blocked = 3
+    ; One flash of led after re-boot to test for obstruction
+    blocked = 1
 
 main:
     for j = 1 to SAMPLES_PER_AVERAGE
@@ -178,6 +184,17 @@ main:
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
+            red = red_avg
+            green = green_avg
+            blue = blue_avg
+
+            ; Debug blocked output
+            #ifdef DEBUG_SENSORS
+                gosub high_speed
+                sertxd("Sensors: R=", #red_avg, ", G=", #green_avg, ", B=", #blue_avg, 13)
+                gosub low_speed
+            #endif
+
         else
             ; Accumulate average data samples
             gosub sensor_blocked_check
@@ -191,7 +208,7 @@ main:
             ; Debug blocked output
             #ifdef DEBUG_SENSORS
                 gosub high_speed
-                sertxd("Sensors: R", #red, ", G", #green, ", B", #blue, 13)
+                sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, 13)
                 gosub low_speed
             #endif
 
@@ -201,18 +218,19 @@ main:
         ; Debug blocked output
         #ifdef DEBUG_BLOCKED
             gosub high_speed
-            sertxd("LED back reflection: K", #k, ", L", #l, 13)
+            sertxd("LED back reflection: K=", #k, ", L=", #l, 13)
             gosub low_speed
         #endif
 
-        if k > 3 then
-            k = k - 3
+        if k > 210 then
+            k = k - 210
         else
             k = 0
         endif
+        ; Check if k is more than 180 brighter than the last two samples
         if k > l and k > red then
             flag = FLAG_BLOCKED ; <--- TODO: combine with poss existing flag val
-            blocked = 3 ; re-test 3 times after long sequential block
+            blocked = 1 ; re-test 3 times after a block
 
             ; Debug blocked sensor output
             #ifdef DEBUG_BLOCKED
@@ -255,7 +273,7 @@ main:
     ; Debug sensor output
     #ifdef DEBUG_WRITE
         gosub high_speed
-        sertxd("Write to ", #i, ", R", #red_byte, ", G", #green_byte, ", B", #blue_byte, ", E", #extra_byte, 13)
+        sertxd("Write to ", #i, ", R=", #red_byte, ", G=", #green_byte, ", B=", #blue_byte, ", E", #extra_byte, 13)
         gosub low_speed
     #endif
 
@@ -268,18 +286,35 @@ main:
 sensor_blocked_check:
     ; TODO: Read from the clear sensor for maximum sensitivity
     readadc10 SENSOR_RED, l
-    k = l * j
-    if k <= red_avg or blocked > 0 then
+    k = j * l
+
+    ; Debug blocked sensor output
+    #ifdef DEBUG_BLOCKED
+        gosub high_speed
+        sertxd("Block check k=", #k, ", red_avg=", #red_avg, ", blocked=", #blocked, 13)
+        gosub low_speed
+    #endif
+
+    ; Check if light has dimmed below average or previously flagged as blocked
+    if k < red_avg or blocked > 0 then
+    ; Debug blocked sensor output
+        #ifdef DEBUG_BLOCKED
+            gosub high_speed
+            sertxd("*FLASH*", 13)
+            gosub low_speed
+        #endif
         high LED
-        nap 1
+        nap 0
         readadc10 SENSOR_RED, k
         low LED
-        nap 1
+        nap 4
     else
-        k = l
+        ; Keep mcu timing roughly the same in each code path
         low LED
+        nap 0
+        readadc10 SENSOR_RED, k
         low LED
-        nap 2
+        nap 4
     endif
     return
 
@@ -329,7 +364,7 @@ flash_led:
     ; Get some attention
     for k = 1 to 20
         high LED
-        nap 1
+        nap 0
         low LED
         nap 2 ; 72ms
     next k
