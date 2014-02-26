@@ -44,6 +44,7 @@
 ;                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
 ; CHANGE LOG:
+; v16 Sensor blocked refactoring
 ; v15 Extended block debugging output
 ;     Tweaked magic number for back reflection (can I auto calibrate this?)
 ;     Longer naps after led flash to reduce sensor ghost response
@@ -87,6 +88,7 @@
 ; v1  Kinda working
 ;
 ; TODO:
+; - Can I software calibrate the sensor response curves as part of first init tests?
 ; - Can I software calibrate the case led reflection value (for various case designs)?
 ; - Add code for clear LDR sensor
 ; - When full, compress data 50% and double number of samples per average and continue
@@ -104,21 +106,21 @@
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
-#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
-#define DEBUG_SENSORS ; Debug output for sensor data
-#define DEBUG_WRITE ; Debug output for data written to eprom
+;#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
+;#define DEBUG_SENSORS ; Debug output for sensor data
+;#define DEBUG_WRITE ; Debug output for data written to eprom
 
 init:
     ; Save all the power we can
     gosub low_speed
     disablebod
     disabletime
-    disconnect
+    disconnect ; will need to power cycle to send upload program
 
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
-    symbol FIRMWARE_VERSION = 15
+    symbol FIRMWARE_VERSION = 16
 
     symbol LED = C.1
     symbol SENSOR_POWER = C.4
@@ -180,7 +182,7 @@ main:
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages for first pass
-            gosub sensor_blocked_check
+            gosub check_if_sensor_blocked
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
@@ -197,7 +199,7 @@ main:
 
         else
             ; Accumulate average data samples
-            gosub sensor_blocked_check
+            gosub check_if_sensor_blocked
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -218,24 +220,24 @@ main:
         ; Debug blocked output
         #ifdef DEBUG_BLOCKED
             gosub high_speed
-            sertxd("LED back reflection: K=", #k, ", L=", #l, 13)
+            sertxd("LED back reflection: K=", #k, ", red=", #red, 13)
             gosub low_speed
         #endif
 
-        if k > 210 then
-            k = k - 210
+        if k > 247 then
+            k = k - 247
         else
             k = 0
         endif
-        ; Check if k is more than 180 brighter than the last two samples
-        if k > l and k > red then
+        ; Check if k is more than a 'magic number' brighter than the last two samples
+        if k > red then
             flag = FLAG_BLOCKED ; <--- TODO: combine with poss existing flag val
             blocked = 1 ; re-test 3 times after a block
 
             ; Debug blocked sensor output
             #ifdef DEBUG_BLOCKED
                 gosub high_speed
-                sertxd("Sensors blocked!", 13)
+                sertxd("*SENSORS BLOCKED!*", 13)
                 gosub low_speed
             #endif
         else
@@ -283,7 +285,7 @@ main:
 
     goto main
 
-sensor_blocked_check:
+check_if_sensor_blocked:
     ; TODO: Read from the clear sensor for maximum sensitivity
     readadc10 SENSOR_RED, l
     k = j * l
@@ -295,8 +297,9 @@ sensor_blocked_check:
         gosub low_speed
     #endif
 
-    ; Check if light has dimmed below average or previously flagged as blocked
-    if k < red_avg or blocked > 0 then
+    l = red_avg / 2
+    ; Check if light has dimmed below 50% of average or previously flagged as blocked
+    if k < l or blocked > 0 then
     ; Debug blocked sensor output
         #ifdef DEBUG_BLOCKED
             gosub high_speed
@@ -304,17 +307,17 @@ sensor_blocked_check:
             gosub low_speed
         #endif
         high LED
-        nap 0
+        ;nap 0
         readadc10 SENSOR_RED, k
         low LED
-        nap 4
+        nap 6
     else
-        ; Keep mcu timing roughly the same in each code path
+        ; Keep mcu timing roughly the same for each code path
         low LED
-        nap 0
+        ;nap 0
         readadc10 SENSOR_RED, k
         low LED
-        nap 4
+        nap 6
     endif
     return
 
