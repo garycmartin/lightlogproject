@@ -1,0 +1,22 @@
+=== Light Log prototype v0.4 part list ===
+
+PICAXE-14M2 [AXE017M2] (also available as a SMD component)
+24LC512 64K EPROM [MIC051] (also available as a SMD component)
+3 x Miniature LDR [SEN002] (~2Mohm dark current)
+Red filter light gel (coloured acetate or cellophane will also work adequately)
+Green filter light gel (coloured acetate or cellophane will also work adequately)
+Blue filter light gel (coloured acetate or cellophane will also work adequately)
+R3, R4, R5, R6, R7. 5 x 4.7Kohm resistors
+C1. 100nF polyester decoupling capacitor (not strictly needed but recommended)
+R8. 50ohm to 100ohm resistor (current limit for LED, can be omitted @ 3V or less operation)
+LED (Example, diffused white 3mm LED 3.0-3.4V Forward Voltage, at 20mA from Adafruit)
+
+USB to 3.5mm jack FTDI based serial cable [AXE027] (for Pic serial programming and light data sync)
+3.5mm stereo socket [CON039] (or [CON039SM] for surface mount version)
+R2. 10Kohm resistor to stop serial in from floating when disconnected from computer (essential for Pic operation)
+R1. 22Kohm resistor to limit current in from computer to serial in
+
+CR2032 Coin cell 3V (circuit will operate between 2.1V and 5.5V)
+CR2032 battery holder (Example, [BAT004H] worked well dring breadboard prototyping)
+
+Where given, part numbers (in square brackets) can be found at http://www.techsupplies.co.uk though many of these parts can be found at other suppliers.
