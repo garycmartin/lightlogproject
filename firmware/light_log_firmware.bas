@@ -65,6 +65,7 @@
 #picaxe 14m2
 ;#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
 ;#define DEBUG_SENSORS ; Debug output for sensor data
+;#define DEBUG_BUTTON ; Debug output for button state
 ;#define DEBUG_WRITE ; Debug output for data written to eprom
 
 init:
@@ -86,6 +87,9 @@ init:
     symbol SENSOR_BLUE = B.5
     symbol SENSOR_CLEAR = C.0
     symbol EVENT_BUTTON = C.3
+
+    ; Button C.3 internal pullup resistor
+    pullup %0000100000000000
 
     ; 5 = default, 63 = max (due to word int maths and avg)
     symbol SAMPLES_PER_AVERAGE = 5
@@ -202,6 +206,16 @@ main:
                 dec blocked
             endif
         endif
+
+        #ifdef DEBUG_BUTTON
+            gosub high_speed
+			if pinC.3 = 0 then
+                sertxd("Button ON", 13)
+            else
+                sertxd("Button OFF", 13)
+            endif
+            gosub low_speed
+        #endif
 
         gosub check_serial_comms
         gosub low_power_and_delay
