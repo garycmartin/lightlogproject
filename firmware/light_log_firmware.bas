@@ -43,49 +43,6 @@
 ;                        LED C.1 -|6   9|- B.4 hi2c sda
 ;                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
 ;                                  –––––
-; CHANGE LOG:
-; v16 Sensor blocked refactoring
-; v15 Extended block debugging output
-;     Tweaked magic number for back reflection (can I auto calibrate this?)
-;     Longer naps after led flash to reduce sensor ghost response
-;     Using nap 0 (18ms) for led flash duration
-;     Only flashes one more time after a block (used to be 3)
-; v14 ****** HARDWARE v0.5 RED FLAG incompatibility *******
-;     C.1 for LED output
-;     C.0 for Clear LDR input
-;     C.3 for Button
-;     Improved debugging output options
-; v13 Last v0.4 hardware compatible version (for original large pendant)
-;     Remove duplicate code blocks in sensor read cycle
-;     Added firmware version to device status
-;     Code clean-up
-; v12 Used for bread board with 281sec step (63 samples per record, 9th/Feb/2014 17:26)
-;     Don't flash led when getting status (looks like a reboot)
-; v11 Fixed light block test
-;     Light led only when it gets darker than average
-;     Light led if previous result was "blocked", light it 3 times to tripple check
-; v10 Testing for back reflection from LED to indicate sensors are blocked
-;     Serial ping 'Hello?' to trigger remote sync if connected
-; v9  Converted data sync format from asci to raw bytes for speed
-;     Power saving tweaks, low speed, no brownout, no time, don't listen for prog
-;     Commands designed for realtime client software use (not human keyboarding)
-;     Less samples, longer gap between
-; v8  Fixed i2c fault at higher than m8 clock speeds
-;     Log data now dumped at m32 (with client connection at 38400 baud)
-; v7  Improved avarages (no roll over between saved samples, more accurate)
-;     Code cleanup
-;     Added dump data and continue test routine
-;     Added serial cmd commands
-;     Dropped to 2Mhz = serial 2400bps (any slower seems to make serial io flakey)
-;     Replaced 255,255,255,255 reboot with extra_byte 2-bit flag in data
-;     High speed erase (should do this for data sync next)
-; v6  Continues from last record on loss of power
-;     Sensors VCC moved to C.4 allowing power down between samples
-; v5  Stuff... (debugging mainly)
-; v4  Minor tinkering...
-; v3  Fixed (maybe) bugs with for loops near max int
-; v2  Corrected for full 64K
-; v1  Kinda working
 ;
 ; TODO:
 ; - Can I software calibrate the sensor response curves as part of first init tests?
