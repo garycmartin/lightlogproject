@@ -153,8 +153,9 @@ main:
 
             ; Debug blocked output
             #ifdef DEBUG_SENSORS
+                readadc10 SENSOR_CLEAR, l
                 gosub high_speed
-                sertxd("Sensors: R=", #red_avg, ", G=", #green_avg, ", B=", #blue_avg, 13)
+                sertxd("Sensors: R=", #red_avg, ", G=", #green_avg, ", B=", #blue_avg, ", C=", #l, 13)
                 gosub low_speed
             #endif
 
@@ -170,8 +171,9 @@ main:
 
             ; Debug blocked output
             #ifdef DEBUG_SENSORS
+                readadc10 SENSOR_CLEAR, l
                 gosub high_speed
-                sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, 13)
+                sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", C=", #l, 13)
                 gosub low_speed
             #endif
 
