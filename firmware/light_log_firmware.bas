@@ -87,7 +87,7 @@ init:
     symbol SENSOR_GREEN = B.2
     symbol SENSOR_BLUE = B.5
     symbol SENSOR_CLEAR = C.0
-    symbol EVENT_BUTTON = C.3
+    symbol EVENT_BUTTON = pinC.3
 
     ; Button C.3 internal pullup resistor
     pullup %0000100000000000
@@ -217,7 +217,7 @@ main:
 
         #ifdef DEBUG_BUTTON
             gosub high_speed
-			if pinC.3 = 0 then
+			if EVENT_BUTTON = 0 then
                 sertxd("Button ON", 13)
             else
                 sertxd("Button OFF", 13)
