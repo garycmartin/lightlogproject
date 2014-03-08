@@ -199,6 +199,9 @@ main:
 
         if j = 1 then
             ; Pre-fill averages for first pass
+            red_avg = red
+            green_avg = green
+            blue_avg = blue
         else
             ; Accumulate average data samples
             red_avg = red + red_avg
