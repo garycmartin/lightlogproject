@@ -119,7 +119,7 @@ init:
     symbol red_avg = w3
     symbol green_avg = w4
     symbol blue_avg = w5
-    symbol i = w6
+    symbol index = w6
     symbol j = w7
     symbol k = w8
     symbol l = w9
@@ -182,7 +182,7 @@ init:
     gosub flash_led
 
     ; Continue recording from last save and the flag reboot
-    read REGISTER_LAST_SAVE_WORD, WORD i
+    read REGISTER_LAST_SAVE_WORD, WORD index
     flag = FLAG_REBOOT
 
 main:
@@ -247,18 +247,18 @@ main:
     flag = FLAG_OK ; Clear any flag states
 
     ; Write data to eprom
-    hi2cout i, (red_byte, green_byte, blue_byte, extra_byte)
+    hi2cout index, (red_byte, green_byte, blue_byte, extra_byte)
 
     ; Debug sensor output
     #ifdef DEBUG_WRITE
         gosub high_speed
-        sertxd("Write to ", #i, ", R=", #red_byte, ", G=", #green_byte, ", B=", #blue_byte, ", E", #extra_byte, 13)
+        sertxd("Write to ", #index, ", R=", #red_byte, ", G=", #green_byte, ", B=", #blue_byte, ", E", #extra_byte, 13)
         gosub low_speed
     #endif
 
     ; Write position to micro eprom and increment (mem bytes = 65536 = word)
-    write REGISTER_LAST_SAVE_WORD, WORD i
-    i = i + 4
+    write REGISTER_LAST_SAVE_WORD, WORD index
+    index = index + 4
 
     goto main
 
@@ -318,7 +318,7 @@ display_status:
     sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
     read REGISTER_REBOOT_COUNT_WORD, WORD k
     sertxd("Device reboot count: ", #k, 13)
-    sertxd("Mem pointer: ", #i, "/65536", 13)
+    sertxd("Mem pointer: ", #index, "/65536", 13)
     calibadc10 k
     l = 52378 / k * 2
     sertxd("Batttey: ", #l, "0mV", 13)
@@ -355,8 +355,8 @@ dump_all_eprom_data:
     return
 
 reset_pointer:
-    i = 0 ; reset pointer back to start of mem
-    write REGISTER_LAST_SAVE_WORD, WORD i
+    index = 0 ; reset pointer back to start of mem
+    write REGISTER_LAST_SAVE_WORD, WORD index
     return
 
 reset_reboot_counter:
