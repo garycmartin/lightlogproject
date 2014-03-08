@@ -164,8 +164,9 @@ init:
 
         #ifdef DEBUG_FIRST_BOOT
             gosub high_speed
+            sertxd("*** First boot ***", 13)
             read REGISTER_UNIQUE_HW_ID_WORD1, WORD k
-            sertxd("UNIQUE HW ID: ", #k)
+            sertxd("Unique HW ID: ", #k)
             read REGISTER_UNIQUE_HW_ID_WORD2, WORD k
             sertxd(", ", #k, 13)
             gosub low_speed
