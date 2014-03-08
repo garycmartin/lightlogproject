@@ -261,6 +261,25 @@ low_power_and_delay:
     sleep 2 ; 1 = 2.3sec watchdog timer
     return
 
+check_user_button:
+    if EVENT_BUTTON = 0 then
+        gosub flash_led
+        gosub high_speed
+        gosub display_status
+        gosub low_speed
+    endif
+
+    #ifdef DEBUG_BUTTON
+        gosub high_speed
+        if EVENT_BUTTON = 0 then
+            sertxd("Button ON", 13)
+        else
+            sertxd("Button OFF", 13)
+        endif
+        gosub low_speed
+    #endif
+    return
+
 check_serial_comms:
     gosub high_speed
     sertxd("Hello?")
