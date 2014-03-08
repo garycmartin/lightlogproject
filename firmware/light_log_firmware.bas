@@ -190,26 +190,27 @@ init:
 main:
     for j = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
+
+        readadc10 SENSOR_RED, red
+        readadc10 SENSOR_GREEN, green
+        readadc10 SENSOR_BLUE, blue
+        readadc10 SENSOR_CLEAR, l
+        low SENSOR_POWER ; Sensors off
+
         if j = 1 then
             ; Pre-fill averages for first pass
-            readadc10 SENSOR_RED, red_avg
-            readadc10 SENSOR_GREEN, green_avg
-            readadc10 SENSOR_BLUE, blue_avg
-            red = red_avg
-            green = green_avg
-            blue = blue_avg
-
         else
             ; Accumulate average data samples
-            readadc10 SENSOR_RED, red
-            readadc10 SENSOR_GREEN, green
-            readadc10 SENSOR_BLUE, blue
             red_avg = red + red_avg
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
-
         endif
-        low SENSOR_POWER ; Sensors off
+
+        #ifdef DEBUG_SENSORS
+            gosub high_speed
+            sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", C=", #l, 13)
+            gosub low_speed
+        #endif
 
         #ifdef DEBUG_BUTTON
             gosub high_speed
