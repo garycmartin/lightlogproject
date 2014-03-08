@@ -78,7 +78,8 @@ init:
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
 
-    symbol FIRMWARE_VERSION = 16
+    symbol FIRMWARE_VERSION = 17
+    symbol HARDWARE_VERSION = 3
 
     symbol LED = C.1
     symbol SENSOR_POWER = C.4
@@ -100,6 +101,17 @@ init:
     symbol FLAG_REBOOT = %11000000
     symbol FLAG_BLOCKED = %01000000
     symbol FLAG_TBA = %10000000
+
+    symbol REGISTER_LAST_SAVE_WORD = 0
+    symbol REGISTER_REBOOT_COUNT_WORD = 2
+    symbol REGISTER_HARDWARE_VERSION_BYTE = 4
+    symbol REGISTER_UNIQUE_HW_ID_WORD1 = 5
+    symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
+    symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
+    symbol REGISTER_LOG_START_TIME_WORD1 = 11
+    symbol REGISTER_LOG_START_TIME_WORD2 = 13
+
+    symbol FIRST_BOOT_PASS_WORD = %1110010110100111
 
     symbol red = w0
     symbol green = w1
@@ -125,14 +137,53 @@ init:
     low LED
     low SENSOR_POWER
 
+	; First boot check
+    read REGISTER_FIRST_BOOT_PASS_WORD, WORD k
+    if k != FIRST_BOOT_PASS_WORD then
+        k = 0
+        write REGISTER_REBOOT_COUNT_WORD, WORD k
+        write REGISTER_LAST_SAVE_WORD, WORD k
+        write REGISTER_LOG_START_TIME_WORD1, WORD k
+        write REGISTER_LOG_START_TIME_WORD2, WORD k
+        write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
+
+        ; Generate unique hardware id (seed from sensor and battery readings)
+        high SENSOR_POWER
+        readadc10 SENSOR_RED, red
+        readadc10 SENSOR_GREEN, green
+        readadc10 SENSOR_BLUE, blue
+        readadc10 SENSOR_CLEAR, l
+        low SENSOR_POWER
+        calibadc10 j
+        k = red * green * blue * l * j
+        random k
+        write REGISTER_UNIQUE_HW_ID_WORD1, WORD k
+        k = k * red * green * blue * l * j
+        random k
+        write REGISTER_UNIQUE_HW_ID_WORD2, WORD k
+
+        #ifdef DEBUG_FIRST_BOOT
+            gosub high_speed
+            read REGISTER_UNIQUE_HW_ID_WORD1, WORD k
+            sertxd("UNIQUE HW ID: ", #k)
+            read REGISTER_UNIQUE_HW_ID_WORD2, WORD k
+            sertxd(", ", #k, 13)
+            gosub low_speed
+        #endif
+
+        ; Mark first boot as passed
+        k = FIRST_BOOT_PASS_WORD
+		write REGISTER_FIRST_BOOT_PASS_WORD, WORD k
+	endif
+
     ; Keep a count of device reboots
-    read 2, WORD k
+    read REGISTER_REBOOT_COUNT_WORD, WORD k
     k = k + 1
-    write 2, WORD k
+    write REGISTER_REBOOT_COUNT_WORD, WORD k
     gosub flash_led
 
     ; Continue recording from last save and the flag reboot
-    read 0, WORD i
+    read REGISTER_LAST_SAVE_WORD, WORD i
     flag = FLAG_REBOOT
 
     ; One flash of led after re-boot to test for obstruction
@@ -253,7 +304,7 @@ main:
     #endif
 
     ; Write position to micro eprom and increment (mem bytes = 65536 = word)
-    write 0, WORD i
+    write REGISTER_LAST_SAVE_WORD, WORD i
     i = i + 4
 
     goto main
@@ -347,8 +398,8 @@ flash_led:
     return
 
 display_status:
-    read 2, WORD k
     sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
+    read REGISTER_REBOOT_COUNT_WORD, WORD k
     sertxd("Device reboot count: ", #k, 13)
     sertxd("Mem pointer: ", #i, "/65536", 13)
     calibadc10 k
@@ -359,7 +410,7 @@ display_status:
 dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
-    read 0, WORD l
+    read REGISTER_LAST_SAVE_WORD, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
@@ -372,7 +423,7 @@ dump_data_and_reset_pointer:
 dump_data:
     ; Debug output data
     hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
-    read 0, WORD l
+    read REGISTER_LAST_SAVE_WORD, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
@@ -394,7 +445,7 @@ dump_all_eprom_data:
 
 reset_pointer:
     i = 0 ; reset pointer back to start of mem
-    write 0, WORD i
+    write REGISTER_LAST_SAVE_WORD, WORD i
     return
 
 reset_reboot_counter:
