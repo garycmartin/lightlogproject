@@ -325,7 +325,6 @@ display_status:
 
 dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
-    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     read REGISTER_LAST_SAVE_WORD, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
@@ -333,30 +332,25 @@ dump_data_and_reset_pointer:
     next k
     sertxd("eof")
     gosub reset_pointer
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
 
 dump_data:
     ; Debug output data
-    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     read REGISTER_LAST_SAVE_WORD, WORD l
     for k = 0 to l step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
     next k
     sertxd("eof")
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
 
 dump_all_eprom_data:
     ; Debug output all eprom data
-    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65531 step 4
         hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
     next k
     sertxd("eof")
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
 
 reset_pointer:
@@ -371,19 +365,19 @@ reset_reboot_counter:
 
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
-    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     for k = 0 to 65534
         hi2cout k, (255)
     next k
     gosub reset_pointer
     gosub reset_reboot_counter
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
 
 high_speed:
     setfreq m32; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
     return
 
 low_speed:
     setfreq k500; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
