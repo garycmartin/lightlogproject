@@ -177,10 +177,11 @@ init:
 	endif
 
     ; Keep a count of device reboots
-    gosub flash_led
     read REGISTER_REBOOT_COUNT_WORD, WORD tmp
     tmp = tmp + 1
     write REGISTER_REBOOT_COUNT_WORD, WORD tmp
+
+    gosub power_on_animation
 
     flag = FLAG_REBOOT
 
@@ -297,14 +298,18 @@ serial_checked:
     gosub low_speed
     return
 
-flash_led:
+power_on_animation:
     ; Get some attention
-    for k = 1 to 20
-        high LED
-        nap 0
-        low LED
-        nap 2 ; 72ms
-    next k
+    for tmp = 1 to 20
+        gosub flash_led
+    next tmp
+    return
+
+flash_led:
+    high LED
+    nap 0
+    low LED
+    nap 2 ; 72ms
     return
 
 display_status:
