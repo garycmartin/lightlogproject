@@ -63,7 +63,6 @@
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
-;#define DEBUG_BLOCKED ; Debug output for LED reflections back to sensor
 ;#define DEBUG_SENSORS ; Debug output for sensor data
 ;#define DEBUG_BUTTON ; Debug output for button state
 ;#define DEBUG_WRITE ; Debug output for data written to eprom
@@ -187,15 +186,11 @@ init:
     read REGISTER_LAST_SAVE_WORD, WORD i
     flag = FLAG_REBOOT
 
-    ; One flash of led after re-boot to test for obstruction
-    blocked = 1
-
 main:
     for j = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
         if j = 1 then
             ; Pre-fill averages for first pass
-            gosub check_if_sensor_blocked
             readadc10 SENSOR_RED, red_avg
             readadc10 SENSOR_GREEN, green_avg
             readadc10 SENSOR_BLUE, blue_avg
@@ -203,17 +198,8 @@ main:
             green = green_avg
             blue = blue_avg
 
-            ; Debug blocked output
-            #ifdef DEBUG_SENSORS
-                readadc10 SENSOR_CLEAR, l
-                gosub high_speed
-                sertxd("Sensors: R=", #red_avg, ", G=", #green_avg, ", B=", #blue_avg, ", C=", #l, 13)
-                gosub low_speed
-            #endif
-
         else
             ; Accumulate average data samples
-            gosub check_if_sensor_blocked
             readadc10 SENSOR_RED, red
             readadc10 SENSOR_GREEN, green
             readadc10 SENSOR_BLUE, blue
@@ -221,45 +207,8 @@ main:
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
 
-            ; Debug blocked output
-            #ifdef DEBUG_SENSORS
-                readadc10 SENSOR_CLEAR, l
-                gosub high_speed
-                sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", C=", #l, 13)
-                gosub low_speed
-            #endif
-
         endif
         low SENSOR_POWER ; Sensors off
-
-        ; Debug blocked output
-        #ifdef DEBUG_BLOCKED
-            gosub high_speed
-            sertxd("LED back reflection: K=", #k, ", red=", #red, 13)
-            gosub low_speed
-        #endif
-
-        if k > 247 then
-            k = k - 247
-        else
-            k = 0
-        endif
-        ; Check if k is more than a 'magic number' brighter than the last two samples
-        if k > red then
-            flag = FLAG_BLOCKED ; <--- TODO: combine with poss existing flag val
-            blocked = 1 ; re-test 3 times after a block
-
-            ; Debug blocked sensor output
-            #ifdef DEBUG_BLOCKED
-                gosub high_speed
-                sertxd("*SENSORS BLOCKED!*", 13)
-                gosub low_speed
-            #endif
-        else
-            if blocked > 0 then
-                dec blocked
-            endif
-        endif
 
         #ifdef DEBUG_BUTTON
             gosub high_speed
@@ -309,42 +258,6 @@ main:
     i = i + 4
 
     goto main
-
-check_if_sensor_blocked:
-    ; TODO: Read from the clear sensor for maximum sensitivity
-    readadc10 SENSOR_RED, l
-    k = j * l
-
-    ; Debug blocked sensor output
-    #ifdef DEBUG_BLOCKED
-        gosub high_speed
-        sertxd("Block check k=", #k, ", red_avg=", #red_avg, ", blocked=", #blocked, 13)
-        gosub low_speed
-    #endif
-
-    l = red_avg / 2
-    ; Check if light has dimmed below 50% of average or previously flagged as blocked
-    if k < l or blocked > 0 then
-    ; Debug blocked sensor output
-        #ifdef DEBUG_BLOCKED
-            gosub high_speed
-            sertxd("*FLASH*", 13)
-            gosub low_speed
-        #endif
-        high LED
-        ;nap 0
-        readadc10 SENSOR_RED, k
-        low LED
-        nap 6
-    else
-        ; Keep mcu timing roughly the same for each code path
-        low LED
-        ;nap 0
-        readadc10 SENSOR_RED, k
-        low LED
-        nap 6
-    endif
-    return
 
 low_power_and_delay:
     ; Save power and sleep
