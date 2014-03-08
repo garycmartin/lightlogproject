@@ -131,7 +131,7 @@ init:
     symbol ser_in_byte = b24
     symbol flag = b25
     symbol scratch = b26
-    symbol blocked = b27
+    ;symbol blocked = b27
 
     ; LED and sensors off
     low LED
