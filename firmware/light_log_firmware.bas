@@ -86,7 +86,7 @@ init:
     symbol SENSOR_RED = B.1
     symbol SENSOR_GREEN = B.2
     symbol SENSOR_BLUE = B.5
-    symbol SENSOR_CLEAR = C.0
+    symbol SENSOR_TRANSPARENT = C.0
     symbol EVENT_BUTTON = pinC.3
 
     ; Button C.3 internal pullup resistor
@@ -116,13 +116,13 @@ init:
     symbol red = w0
     symbol green = w1
     symbol blue = w2
-    symbol red_avg = w3
-    symbol green_avg = w4
-    symbol blue_avg = w5
-    symbol index = w6
-    symbol j = w7
-    symbol k = w8
-    symbol l = w9
+	symbol transparent = w3
+    symbol red_avg = w4
+    symbol green_avg = w5
+    symbol blue_avg = w6
+    symbol transparent_avg = w7
+    symbol index = w8
+    symbol tmp = w9
 
     symbol red_byte = b20
     symbol green_byte = b21
@@ -130,107 +130,99 @@ init:
     symbol extra_byte = b23
     symbol ser_in_byte = b24
     symbol flag = b25
+    symbol sample_loop = b26
 
     ; LED and sensors off
     low LED
     low SENSOR_POWER
 
 	; First boot check
-    read REGISTER_FIRST_BOOT_PASS_WORD, WORD k
-    if k != FIRST_BOOT_PASS_WORD then
-        k = 0
-        write REGISTER_REBOOT_COUNT_WORD, WORD k
-        write REGISTER_LAST_SAVE_WORD, WORD k
-        write REGISTER_LOG_START_TIME_WORD1, WORD k
-        write REGISTER_LOG_START_TIME_WORD2, WORD k
+    read REGISTER_FIRST_BOOT_PASS_WORD, WORD tmp
+    if tmp != FIRST_BOOT_PASS_WORD then
         write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
+        tmp = 0
+        write REGISTER_REBOOT_COUNT_WORD, WORD tmp
+        write REGISTER_LAST_SAVE_WORD, WORD tmp
+        write REGISTER_LOG_START_TIME_WORD1, WORD tmp
+        write REGISTER_LOG_START_TIME_WORD2, WORD tmp
 
         ; Generate unique hardware id (seed from sensor and battery readings)
         high SENSOR_POWER
         readadc10 SENSOR_RED, red
         readadc10 SENSOR_GREEN, green
         readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_CLEAR, l
+        readadc10 SENSOR_TRANSPARENT, transparent
         low SENSOR_POWER
-        calibadc10 j
-        k = red * green * blue * l * j
-        random k
-        write REGISTER_UNIQUE_HW_ID_WORD1, WORD k
-        k = k * red * green * blue * l * j
-        random k
-        write REGISTER_UNIQUE_HW_ID_WORD2, WORD k
+        calibadc10 tmp
+        tmp = red * green * blue * transparent * tmp
+        random tmp
+        write REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+        tmp = red * green * blue * transparent * tmp
+        random tmp
+        write REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
 
         #ifdef DEBUG_FIRST_BOOT
             gosub high_speed
             sertxd("*** First boot ***", 13)
-            read REGISTER_UNIQUE_HW_ID_WORD1, WORD k
-            sertxd("Unique HW ID: ", #k)
-            read REGISTER_UNIQUE_HW_ID_WORD2, WORD k
-            sertxd(", ", #k, 13)
+            read REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+            sertxd("Unique HW ID: ", #tmp)
+            read REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
+            sertxd(", ", #tmp, 13)
             gosub low_speed
         #endif
 
         ; Mark first boot as passed
-        k = FIRST_BOOT_PASS_WORD
-		write REGISTER_FIRST_BOOT_PASS_WORD, WORD k
+        tmp = FIRST_BOOT_PASS_WORD
+		write REGISTER_FIRST_BOOT_PASS_WORD, WORD tmp
 	endif
 
     ; Keep a count of device reboots
-    read REGISTER_REBOOT_COUNT_WORD, WORD k
-    k = k + 1
-    write REGISTER_REBOOT_COUNT_WORD, WORD k
     gosub flash_led
+    read REGISTER_REBOOT_COUNT_WORD, WORD tmp
+    tmp = tmp + 1
+    write REGISTER_REBOOT_COUNT_WORD, WORD tmp
 
-    ; Continue recording from last save and the flag reboot
-    read REGISTER_LAST_SAVE_WORD, WORD index
     flag = FLAG_REBOOT
 
 main:
-    for j = 1 to SAMPLES_PER_AVERAGE
+    for sample_loop = 1 to SAMPLES_PER_AVERAGE
         high SENSOR_POWER ; Sensors on
-
         readadc10 SENSOR_RED, red
         readadc10 SENSOR_GREEN, green
         readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_CLEAR, l
+        readadc10 SENSOR_TRANSPARENT, transparent
         low SENSOR_POWER ; Sensors off
 
-        if j = 1 then
+        if sample_loop = 1 then
             ; Pre-fill averages for first pass
             red_avg = red
             green_avg = green
             blue_avg = blue
+            transparent_avg = transparent
         else
             ; Accumulate average data samples
             red_avg = red + red_avg
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
+            transparent_avg = transparent + transparent_avg
         endif
 
         #ifdef DEBUG_SENSORS
             gosub high_speed
-            sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", C=", #l, 13)
+            sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", T=", #transparent, 13)
             gosub low_speed
         #endif
 
-        #ifdef DEBUG_BUTTON
-            gosub high_speed
-			if EVENT_BUTTON = 0 then
-                sertxd("Button ON", 13)
-            else
-                sertxd("Button OFF", 13)
-            endif
-            gosub low_speed
-        #endif
-
+        gosub check_user_button
         gosub check_serial_comms
         gosub low_power_and_delay
-    next j
+    next sample_loop
 
     ; Calculate averages
     red_avg = red_avg / SAMPLES_PER_AVERAGE
     green_avg = green_avg / SAMPLES_PER_AVERAGE
     blue_avg = blue_avg / SAMPLES_PER_AVERAGE
+    transparent_avg = transparent_avg / SAMPLES_PER_AVERAGE
 
     ; Store least significant bytes
     red_byte = red_avg & %11111111
@@ -247,6 +239,7 @@ main:
     flag = FLAG_OK ; Clear any flag states
 
     ; Write data to eprom
+    read REGISTER_LAST_SAVE_WORD, WORD index
     hi2cout index, (red_byte, green_byte, blue_byte, extra_byte)
 
     ; Debug sensor output
@@ -256,9 +249,9 @@ main:
         gosub low_speed
     #endif
 
-    ; Write position to micro eprom and increment (mem bytes = 65536 = word)
-    write REGISTER_LAST_SAVE_WORD, WORD index
+    ; Increment and write position to micro eprom (mem bytes = 65536)
     index = index + 4
+    write REGISTER_LAST_SAVE_WORD, WORD index
 
     goto main
 
@@ -315,42 +308,60 @@ flash_led:
     return
 
 display_status:
+	read REGISTER_HARDWARE_VERSION_BYTE, tmp
+    sertxd("Hardware version: ", #tmp, 13)
+    read REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+    sertxd("Unique hardware ID: ", #tmp)
+    read REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
+    sertxd(", ", #tmp, 13)
     sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
-    read REGISTER_REBOOT_COUNT_WORD, WORD k
-    sertxd("Device reboot count: ", #k, 13)
+    read REGISTER_REBOOT_COUNT_WORD, WORD tmp
+    sertxd("Device reboot count: ", #tmp, 13)
+    read REGISTER_LAST_SAVE_WORD, WORD index
     sertxd("Mem pointer: ", #index, "/65536", 13)
-    calibadc10 k
-    l = 52378 / k * 2
-    sertxd("Batttey: ", #l, "0mV", 13)
+	read REGISTER_LOG_START_TIME_WORD1, WORD tmp
+    sertxd("Log start: ", #tmp)
+	read REGISTER_LOG_START_TIME_WORD2, WORD tmp
+    sertxd(", ", #tmp, 13)
+    calibadc10 tmp
+    tmp = 52378 / tmp * 2
+    sertxd("Batttey: ", #tmp, "0mV", 13)
+    sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", T=", #transparent, 13)
     return
 
 dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
-    read REGISTER_LAST_SAVE_WORD, WORD l
-    for k = 0 to l step 4
-        hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
+    read REGISTER_LAST_SAVE_WORD, WORD index
+    if index != 0 then
+	    index = index - 4
+    endif
+    for tmp = 0 to index step 4
+        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
-    next k
+    next tmp
     sertxd("eof")
     gosub reset_pointer
     return
 
 dump_data:
     ; Debug output data
-    read REGISTER_LAST_SAVE_WORD, WORD l
-    for k = 0 to l step 4
-        hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
+    read REGISTER_LAST_SAVE_WORD, WORD index
+    if index != 0 then
+	    index = index - 4
+    endif
+    for tmp = 0 to index step 4
+        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
-    next k
+    next tmp
     sertxd("eof")
     return
 
 dump_all_eprom_data:
     ; Debug output all eprom data
-    for k = 0 to 65531 step 4
-        hi2cin k, (red_byte, green_byte, blue_byte, extra_byte)
+    for tmp = 0 to 65531 step 4
+        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
         sertxd (red_byte, green_byte, blue_byte, extra_byte)
-    next k
+    next tmp
     sertxd("eof")
     return
 
@@ -360,15 +371,15 @@ reset_pointer:
     return
 
 reset_reboot_counter:
-    k = 0
-    write 2, WORD k ; reset reboot counter back to 0
+    tmp = 0
+    write 2, WORD tmp ; reset reboot counter back to 0
     return
 
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
-    for k = 0 to 65534
-        hi2cout k, (255)
-    next k
+    for tmp = 0 to 65534
+        hi2cout tmp, (255)
+    next tmp
     gosub reset_pointer
     gosub reset_reboot_counter
     return
