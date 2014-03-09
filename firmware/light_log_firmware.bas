@@ -45,9 +45,8 @@
 ;                                  –––––
 ;
 ; TODO:
-; - Can I software calibrate the sensor response curves as part of first init tests?
-; - Can I software calibrate the case led reflection value (for various case designs)?
-; - Add code for clear LDR sensor
+; - Software calibrate the sensor response curves as part of first init tests
+; - Finishing adding code for clear LDR sensor
 ; - When full, compress data 50% and double number of samples per average and continue
 ; - Extend two way serial protocol:
 ;   - log start time (and transmit it during sync)
@@ -55,6 +54,7 @@
 ;   - report hardware version in status (store in picaxe rom, defined during first run)
 ;   - add a validate/checksum to sync process
 ; - Calculate and store average samples varience (indication of activity)?
+; - HW: LED to C.2 would allow pwmout command for dimming control
 ; - HW: Use external RTC?
 ; - HW: Move B.1 for use of hardware serial in?
 ; - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
@@ -73,7 +73,7 @@ init:
     gosub low_speed
     disablebod
     disabletime
-    disconnect ; will need to power cycle to send upload program
+    disconnect ; Will need to power cycle to send upload program
 
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
@@ -95,8 +95,6 @@ init:
     ; 5 = default, 63 = max (due to word int maths and avg)
     symbol SAMPLES_PER_AVERAGE = 5
 
-    ; TODO: Check these realy work as expected and don't just point to pins!!!!!
-    ;       Use #define instead if this is a bug?
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
     symbol FLAG_BLOCKED = %01000000
