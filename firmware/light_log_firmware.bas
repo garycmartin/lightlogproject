@@ -102,6 +102,8 @@ init:
     symbol FLAG_BLOCKED = %01000000
     symbol FLAG_TBA = %10000000
 
+    symbol FIRST_BOOT_PASS_WORD = %1110010110100111
+
     symbol REGISTER_LAST_SAVE_WORD = 0
     symbol REGISTER_REBOOT_COUNT_WORD = 2
     symbol REGISTER_HARDWARE_VERSION_BYTE = 4
@@ -111,7 +113,12 @@ init:
     symbol REGISTER_LOG_START_TIME_WORD1 = 11
     symbol REGISTER_LOG_START_TIME_WORD2 = 13
 
-    symbol FIRST_BOOT_PASS_WORD = %1110010110100111
+    symbol BYTES_PER_RECORD = 6
+    symbol EEPROM_TOTAL_BYTES = 65536
+    symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
+    symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
+    symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
+    symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
 
     symbol red = w0
     symbol green = w1
@@ -127,10 +134,11 @@ init:
     symbol red_byte = b20
     symbol green_byte = b21
     symbol blue_byte = b22
-    symbol extra_byte = b23
-    symbol ser_in_byte = b24
-    symbol flag = b25
-    symbol sample_loop = b26
+    symbol transparent_byte = b23
+    symbol extra_byte = b24
+    symbol ser_in_byte = b25
+    symbol flag = b26
+    symbol sample_loop = b27
 
     ; LED and sensors off
     low LED
@@ -210,7 +218,10 @@ main:
 
         #ifdef DEBUG_SENSORS
             gosub high_speed
-            sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", T=", #transparent, 13)
+            sertxd("Sensors: R=", #red, _
+                   ", G=", #green, _
+                   ", B=", #blue, _
+                   ", T=", #transparent, 13)
             gosub low_speed
         #endif
 
@@ -229,29 +240,39 @@ main:
     red_byte = red_avg & %11111111
     green_byte = green_avg & %11111111
     blue_byte = blue_avg & %11111111
+    transparent_byte = transparent_avg & %11111111
 
-    ; Fill extra_byte with 9th and 10th bits from each rgb
+    ; Fill extra_byte with 9th and 10th bits of each RGBT
     extra_byte = red_avg & %1100000000 / 256
     extra_byte = green_avg & %1100000000 / 64 + extra_byte
     extra_byte = blue_avg & %1100000000 / 16 + extra_byte
-
-    ; Use extra_byte's 2 unsed bits for signaling
-    extra_byte = extra_byte + flag
-    flag = FLAG_OK ; Clear any flag states
+    extra_byte = transparent_avg & %1100000000 / 4 + extra_byte
 
     ; Write data to eprom
     read REGISTER_LAST_SAVE_WORD, WORD index
-    hi2cout index, (red_byte, green_byte, blue_byte, extra_byte)
+    hi2cout index, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
 
     ; Debug sensor output
     #ifdef DEBUG_WRITE
         gosub high_speed
-        sertxd("Write to ", #index, ", R=", #red_byte, ", G=", #green_byte, ", B=", #blue_byte, ", E", #extra_byte, 13)
+        sertxd("Write to ", #index, _
+               ", R=", #red_byte, _
+               ", G=", #green_byte, _
+               ", B=", #blue_byte, _
+               ", T=", transparent_byte, _
+               ", E=", #extra_byte, _
+               ", F=", flag, 13)
         gosub low_speed
     #endif
 
+    flag = FLAG_OK ; Clear any flag states
+
     ; Increment and write position to micro eprom (mem bytes = 65536)
-    index = index + 4
+	if index < LAST_VALID_RECORD then
+        index = index + 6
+    else
+        index = 0
+    endif
     write REGISTER_LAST_SAVE_WORD, WORD index
 
     goto main
@@ -385,11 +406,11 @@ dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
     read REGISTER_LAST_SAVE_WORD, WORD index
     if index != 0 then
-	    index = index - 4
+	    index = index - BYTES_PER_RECORD
     endif
-    for tmp = 0 to index step 4
-        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (red_byte, green_byte, blue_byte, extra_byte)
+    for tmp = 0 to index step BYTES_PER_RECORD
+        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     gosub reset_pointer
@@ -399,20 +420,20 @@ dump_data:
     ; Debug output data
     read REGISTER_LAST_SAVE_WORD, WORD index
     if index != 0 then
-	    index = index - 4
+	    index = index - BYTES_PER_RECORD
     endif
-    for tmp = 0 to index step 4
-        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (red_byte, green_byte, blue_byte, extra_byte)
+    for tmp = 0 to index step BYTES_PER_RECORD
+        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     return
 
 dump_all_eprom_data:
     ; Debug output all eprom data
-    for tmp = 0 to 65531 step 4
-        hi2cin tmp, (red_byte, green_byte, blue_byte, extra_byte)
-        sertxd (red_byte, green_byte, blue_byte, extra_byte)
+    for tmp = 0 to LAST_VALID_RECORD step BYTES_PER_RECORD
+        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     return
@@ -424,13 +445,13 @@ reset_pointer:
 
 reset_reboot_counter:
     tmp = 0
-    write 2, WORD tmp ; reset reboot counter back to 0
+    write REGISTER_REBOOT_COUNT_WORD, WORD tmp ; reset reboot counter back to 0
     return
 
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
-    for tmp = 0 to 65534
-        hi2cout tmp, (255)
+    for tmp = 0 to END_EEPROM_ADDRESS
+        hi2cout tmp, (0)
     next tmp
     gosub reset_pointer
     gosub reset_reboot_counter
