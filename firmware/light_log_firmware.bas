@@ -262,15 +262,6 @@ low_power_and_delay:
     return
 
 check_user_button:
-    if EVENT_BUTTON = 0 then
-        gosub pulse_led
-        gosub pulse_led
-        gosub pulse_led
-        gosub high_speed
-        gosub display_status
-        gosub low_speed
-    endif
-
     #ifdef DEBUG_BUTTON
         gosub high_speed
         if EVENT_BUTTON = 0 then
@@ -280,6 +271,16 @@ check_user_button:
         endif
         gosub low_speed
     #endif
+
+    if EVENT_BUTTON = 0 then
+        gosub high_speed
+        gosub display_status
+        gosub low_speed
+
+        gosub pulse_led
+        gosub pulse_led
+        gosub pulse_led
+    endif
     return
 
 check_serial_comms:
