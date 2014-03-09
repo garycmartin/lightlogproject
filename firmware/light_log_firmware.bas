@@ -66,7 +66,7 @@
 ;#define DEBUG_SENSORS ; Debug output for sensor data
 ;#define DEBUG_BUTTON ; Debug output for button state
 ;#define DEBUG_WRITE ; Debug output for data written to eprom
-#define DEBUG_FIRST_BOOT
+;#define DEBUG_FIRST_BOOT
 
 init:
     ; Save all the power we can
