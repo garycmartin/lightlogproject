@@ -131,7 +131,6 @@ init:
     symbol ser_in_byte = b24
     symbol flag = b25
     symbol sample_loop = b26
-	symbol scratch = b27
 
     ; LED and sensors off
     low LED
@@ -322,9 +321,11 @@ serial_checked:
 
 power_on_animation:
     ; Get some attention
-    for scratch = 1 to 5
-        gosub pulse_led
-    next scratch
+    gosub pulse_led
+    gosub pulse_led
+    gosub pulse_led
+    gosub pulse_led
+    gosub pulse_led
     return
 
 flash_led:
