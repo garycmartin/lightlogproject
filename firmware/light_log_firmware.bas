@@ -131,6 +131,7 @@ init:
     symbol ser_in_byte = b24
     symbol flag = b25
     symbol sample_loop = b26
+	symbol scratch = b27
 
     ; LED and sensors off
     low LED
@@ -263,7 +264,9 @@ low_power_and_delay:
 
 check_user_button:
     if EVENT_BUTTON = 0 then
-        gosub flash_led
+        gosub pulse_led
+        gosub pulse_led
+        gosub pulse_led
         gosub high_speed
         gosub display_status
         gosub low_speed
@@ -283,7 +286,7 @@ check_user_button:
 check_serial_comms:
     gosub high_speed
     sertxd("Hello?")
-    serrxd [100, serial_checked], ser_in_byte
+    serrxd [120, serial_checked], ser_in_byte
     ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
     ;serrxd ser_in_byte
 
@@ -319,9 +322,9 @@ serial_checked:
 
 power_on_animation:
     ; Get some attention
-    for tmp = 1 to 20
-        gosub flash_led
-    next tmp
+    for scratch = 1 to 5
+        gosub pulse_led
+    next scratch
     return
 
 flash_led:
@@ -329,6 +332,29 @@ flash_led:
     nap 0
     low LED
     nap 2 ; 72ms
+    return
+
+pulse_led:
+    gosub high_speed
+    ; Fade up
+	for tmp = 0 to 13000 step 1300
+        high LED
+        pauseus tmp
+        low LED
+        tmp = 15000 - tmp
+        pauseus tmp
+        tmp = 15000 - tmp
+    next tmp
+    ; Fade down
+	for tmp = 0 to 13000 step 1300
+        high LED
+        tmp = 15000 - tmp
+        pauseus tmp
+        tmp = 15000 - tmp
+        low LED
+        pauseus tmp
+    next tmp
+    gosub low_speed
     return
 
 display_status:
