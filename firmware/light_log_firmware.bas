@@ -1,65 +1,67 @@
-;Copyright (c) 2013, Gary C. Martin <gary@lightlogproject.org>
-;All rights reserved.
-;
-;Redistribution and use in source and binary forms, with or without
-;modification, are permitted provided that the following conditions are met:
-;
-;1. Redistributions of source code must retain the above copyright notice, this
-;   list of conditions and the following disclaimer.
-;
-;2. Redistributions in binary form must reproduce the above copyright notice,
-;   this list of conditions and the following disclaimer in the documentation
-;   and/or other materials provided with the distribution.
-;
-;THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-;AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-;IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-;ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-;LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-;CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-;SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-;INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-;CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-;ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-;POSSIBILITY OF SUCH DAMAGE.
-;
-;
-; 14M2 ADC inputs for RGB light level logging to i2c 64K eprom
-;                                  _____
-;                             +V -|1 ^14|- 0V
-;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
-;           Touch/ADC/Out/In C.4 -|3  12|- B.1 In/Out/ADC/Touch/SRI/hserin
-;                         In C.3 -|4  11|- B.2 In/Out/ADC/Touch/pwm/SRQ
-;     kbclk/hpwmA/pwm/Out/In C.2 -|5  10|- B.3 In/Out/ADC/Touch/hi2c scl
-;        kbdata/hpwmB/Out/In C.1 -|6   9|- B.4 In/Out/ADC/Touch/pwm/hi2c sda
-; hpwmC/pwm/Touch/ADC/Out/In C.0 -|7   8|- B.5 In/Out/ADC/Touch/hpwmD
-;                                  –––––
-;                                  _____
-;                             +V -|1 ^14|- 0V
-;               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
-;             Sensors enable C.4 -|3  12|- B.1 Red ADC
-;                     Button C.3 -|4  11|- B.2 Green ADC
-;                            C.2 -|5  10|- B.3 hi2c scl
-;                        LED C.1 -|6   9|- B.4 hi2c sda
-;                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
-;                                  –––––
-;
-; TODO:
-; - Software calibrate the sensor response curves as part of first init tests
-; - Finishing adding code for clear LDR sensor
-; - When full, compress data 50% and double number of samples per average and continue
-; - Extend two way serial protocol:
-;   - log start time (and transmit it during sync)
-;   - generate device id for first boot (and transmit it during sync)
-;   - report hardware version in status (store in picaxe rom, defined during first run)
-;   - add a validate/checksum to sync process
-; - Calculate and store average samples varience (indication of activity)?
-; - HW: LED to C.2 would allow pwmout command for dimming control
-; - HW: Use external RTC?
-; - HW: Move B.1 for use of hardware serial in?
-; - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
-; - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
-; - Use a button to interrupt, short press for marker, long hold for reboot
+#rem
+Copyright (c) 2013, Gary C. Martin <gary@lightlogproject.org>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+
+ 14M2 ADC inputs for RGB light level logging to i2c 64K eprom
+                                  _____
+                             +V -|1 ^14|- 0V
+               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
+           Touch/ADC/Out/In C.4 -|3  12|- B.1 In/Out/ADC/Touch/SRI/hserin
+                         In C.3 -|4  11|- B.2 In/Out/ADC/Touch/pwm/SRQ
+     kbclk/hpwmA/pwm/Out/In C.2 -|5  10|- B.3 In/Out/ADC/Touch/hi2c scl
+        kbdata/hpwmB/Out/In C.1 -|6   9|- B.4 In/Out/ADC/Touch/pwm/hi2c sda
+ hpwmC/pwm/Touch/ADC/Out/In C.0 -|7   8|- B.5 In/Out/ADC/Touch/hpwmD
+                                  –––––
+                                  _____
+                             +V -|1 ^14|- 0V
+               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
+             Sensors enable C.4 -|3  12|- B.1 Red ADC
+                     Button C.3 -|4  11|- B.2 Green ADC
+                            C.2 -|5  10|- B.3 hi2c scl
+                        LED C.1 -|6   9|- B.4 hi2c sda
+                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
+                                  –––––
+
+ TODO:
+ - Software calibrate the sensor response curves as part of first init tests
+ - Finishing adding code for clear LDR sensor
+ - When full, compress data 50% and double number of samples per average and continue
+ - Extend two way serial protocol:
+   - log start time (and transmit it during sync)
+   - generate device id for first boot (and transmit it during sync)
+   - report hardware version in status (store in picaxe rom, defined during first run)
+   - add a validate/checksum to sync process
+ - Calculate and store average samples varience (indication of activity)?
+ - HW: LED to C.2 would allow pwmout command for dimming control
+ - HW: Use external RTC?
+ - HW: Move B.1 for use of hardware serial in?
+ - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
+ - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
+ - Use a button to interrupt, short press for marker, long hold for reboot
+#endrem
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
