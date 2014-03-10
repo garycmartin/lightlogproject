@@ -346,7 +346,7 @@ check_serial_comms:
 
     endif
 
-serial_checked:
+    serial_checked:
     gosub low_speed
     return
 
