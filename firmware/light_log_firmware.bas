@@ -314,7 +314,7 @@ check_user_button:
 check_serial_comms:
     gosub high_speed
     sertxd("Hello?")
-    serrxd [120, serial_checked], ser_in_byte
+    serrxd [150, serial_checked], ser_in_byte
     ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
     ;serrxd ser_in_byte
 
