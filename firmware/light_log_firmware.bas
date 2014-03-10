@@ -250,9 +250,12 @@ main:
 
     ; Write data to eprom
     read REGISTER_LAST_SAVE_WORD, WORD index
-    hi2cout index, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
-    nap 0 ; Needs a delay or else ocassionally seems to glitch writes
-
+    hi2cout index, (red_byte, green_byte)
+	index = index + 2
+    hi2cout index, (blue_byte, white_byte)
+	index = index + 2
+    hi2cout index, (extra_byte, flag)
+	index = index + 2
 
     ; Debug sensor output
     #ifdef DEBUG_WRITE
@@ -270,9 +273,7 @@ main:
     flag = FLAG_OK ; Clear any flag states
 
     ; Increment and write position to micro eprom (mem bytes = 65536)
-	if index < LAST_VALID_RECORD then
-        index = index + BYTES_PER_RECORD
-    else
+	if index >= LAST_VALID_RECORD then
         index = 0
     endif
     write REGISTER_LAST_SAVE_WORD, WORD index
