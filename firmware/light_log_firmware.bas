@@ -317,8 +317,6 @@ check_serial_comms:
     gosub high_speed
     sertxd("Hello?")
     serrxd [150, serial_checked], ser_in_byte
-    ;serrxd [100, serial_checked], ("cmd"), ser_in_byte
-    ;serrxd ser_in_byte
 
     if ser_in_byte = "a" then
         gosub display_status
