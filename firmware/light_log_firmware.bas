@@ -224,8 +224,7 @@ main:
         #endif
 
         gosub check_user_button
-        ;gosub check_serial_comms
-        gosub low_power_and_delay
+        gosub low_power_delay
     next sample_loop
 
     ; Calculate averages
@@ -278,7 +277,7 @@ main:
 
     goto main
 
-low_power_and_delay:
+low_power_delay:
     ; Save power and sleep
     sleep 2 ; 4.6sec watchdog timer
     ;sleep 1 ; 2.3sec watchdog timer <---------- fill up memory quickly for testing
