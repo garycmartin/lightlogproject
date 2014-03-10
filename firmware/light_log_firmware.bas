@@ -226,7 +226,7 @@ main:
         #endif
 
         gosub check_user_button
-        gosub check_serial_comms
+        ;gosub check_serial_comms
         gosub low_power_and_delay
     next sample_loop
 
@@ -300,9 +300,14 @@ check_user_button:
         gosub display_status
         gosub low_speed
 
+        reconnect
+        gosub check_serial_comms
+        disconnect
+
         gosub pulse_led
         gosub pulse_led
         gosub pulse_led
+
     endif
     return
 
