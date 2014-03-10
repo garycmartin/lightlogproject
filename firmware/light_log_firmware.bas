@@ -251,6 +251,8 @@ main:
     ; Write data to eprom
     read REGISTER_LAST_SAVE_WORD, WORD index
     hi2cout index, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+    nap 0 ; Needs a delay or else ocassionally seems to glitch writes
+
 
     ; Debug sensor output
     #ifdef DEBUG_WRITE
@@ -450,8 +452,9 @@ reset_reboot_counter:
 
 erase_all_data:
     ; Debug erase eprom data (help with debugging)
-    for tmp = 0 to END_EEPROM_ADDRESS
-        hi2cout tmp, (0)
+    for tmp = 0 to 65518 step 16
+        hi2cout tmp, (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        nap 0 ; Needs a delay or else looses writes
     next tmp
     gosub reset_pointer
     gosub reset_reboot_counter
