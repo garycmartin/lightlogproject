@@ -302,13 +302,13 @@ check_user_button:
         gosub display_status
         gosub low_speed
 
-        reconnect
         gosub check_serial_comms
-        disconnect
 
+        reconnect
         gosub pulse_led
         gosub pulse_led
         gosub pulse_led
+        disconnect
 
     endif
     return
