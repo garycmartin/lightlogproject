@@ -65,6 +65,7 @@ TODO:
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
 #picaxe 14m2
+
 ;#define DEBUG_SENSORS ; Debug output for sensor data
 ;#define DEBUG_BUTTON ; Debug output for button state
 ;#define DEBUG_WRITE ; Debug output for data written to eprom
@@ -75,10 +76,9 @@ init:
     gosub low_speed
     disablebod
     disabletime
-    disconnect ; Will need to power cycle to send upload program
-
     ; I2C setup
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+    disconnect
 
     symbol FIRMWARE_VERSION = 17
     symbol HARDWARE_VERSION = 3
