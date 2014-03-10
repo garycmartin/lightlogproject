@@ -235,16 +235,16 @@ main:
     white_avg = white_avg / SAMPLES_PER_AVERAGE
 
     ; Store least significant bytes
-    red_byte = red_avg & %11111111
+    red_byte = red_avg     & %11111111
     green_byte = green_avg & %11111111
-    blue_byte = blue_avg & %11111111
+    blue_byte = blue_avg   & %11111111
     white_byte = white_avg & %11111111
 
     ; Fill extra_byte with 9th and 10th bits of each RGBT
-    extra_byte = red_avg & %1100000000 / 256
+    extra_byte = red_avg   & %1100000000 / 256
     extra_byte = green_avg & %1100000000 / 64 + extra_byte
-    extra_byte = blue_avg & %1100000000 / 16 + extra_byte
-    extra_byte = white_avg & %1100000000 / 4 + extra_byte
+    extra_byte = blue_avg  & %1100000000 / 16 + extra_byte
+    extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
     ; Write data to eprom
     read REGISTER_LAST_SAVE_WORD, WORD index
