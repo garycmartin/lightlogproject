@@ -340,7 +340,7 @@ check_serial_comms:
         gosub erase_all_data
 
     else
-        sertxd("Error ", #ser_in_byte, 13)
+        sertxd("Unknown command: ", ser_in_byte, 13)
 
     endif
 
