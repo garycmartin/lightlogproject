@@ -76,8 +76,6 @@ init:
     gosub low_speed
     disablebod
     disabletime
-    ; I2C setup
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     disconnect
 
     symbol FIRMWARE_VERSION = 17
