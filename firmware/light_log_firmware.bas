@@ -45,7 +45,7 @@ POSSIBILITY OF SUCH DAMAGE.
                   Clear ADC C.0 -|7   8|- B.5 Blue ADC
                                   –––––
 
- TODO:
+TODO:
  - Software calibrate the sensor response curves as part of first init tests
  - Finishing adding code for clear LDR sensor
  - When full, compress data 50% and double number of samples per average and continue
@@ -88,7 +88,7 @@ init:
     symbol SENSOR_RED = B.1
     symbol SENSOR_GREEN = B.2
     symbol SENSOR_BLUE = B.5
-    symbol SENSOR_TRANSPARENT = C.0
+    symbol SENSOR_WHITE = C.0
     symbol EVENT_BUTTON = pinC.3
 
     ; Button C.3 internal pullup resistor
@@ -123,18 +123,18 @@ init:
     symbol red = w0
     symbol green = w1
     symbol blue = w2
-	symbol transparent = w3
+	symbol white = w3
     symbol red_avg = w4
     symbol green_avg = w5
     symbol blue_avg = w6
-    symbol transparent_avg = w7
+    symbol white_avg = w7
     symbol index = w8
     symbol tmp = w9
 
     symbol red_byte = b20
     symbol green_byte = b21
     symbol blue_byte = b22
-    symbol transparent_byte = b23
+    symbol white_byte = b23
     symbol extra_byte = b24
     symbol ser_in_byte = b25
     symbol flag = b26
@@ -159,13 +159,13 @@ init:
         readadc10 SENSOR_RED, red
         readadc10 SENSOR_GREEN, green
         readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_TRANSPARENT, transparent
+        readadc10 SENSOR_WHITE, white
         low SENSOR_POWER
         calibadc10 tmp
-        tmp = red * green * blue * transparent * tmp
+        tmp = red * green * blue * white * tmp
         random tmp
         write REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
-        tmp = red * green * blue * transparent * tmp
+        tmp = red * green * blue * white * tmp
         random tmp
         write REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
 
@@ -199,7 +199,7 @@ main:
         readadc10 SENSOR_RED, red
         readadc10 SENSOR_GREEN, green
         readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_TRANSPARENT, transparent
+        readadc10 SENSOR_WHITE, white
         low SENSOR_POWER ; Sensors off
 
         if sample_loop = 1 then
@@ -207,13 +207,13 @@ main:
             red_avg = red
             green_avg = green
             blue_avg = blue
-            transparent_avg = transparent
+            white_avg = white
         else
             ; Accumulate average data samples
             red_avg = red + red_avg
             green_avg = green + green_avg
             blue_avg = blue + blue_avg
-            transparent_avg = transparent + transparent_avg
+            white_avg = white + white_avg
         endif
 
         #ifdef DEBUG_SENSORS
@@ -221,7 +221,7 @@ main:
             sertxd("Sensors: R=", #red, _
                    ", G=", #green, _
                    ", B=", #blue, _
-                   ", T=", #transparent, 13)
+                   ", W=", #white, 13)
             gosub low_speed
         #endif
 
@@ -234,23 +234,23 @@ main:
     red_avg = red_avg / SAMPLES_PER_AVERAGE
     green_avg = green_avg / SAMPLES_PER_AVERAGE
     blue_avg = blue_avg / SAMPLES_PER_AVERAGE
-    transparent_avg = transparent_avg / SAMPLES_PER_AVERAGE
+    white_avg = white_avg / SAMPLES_PER_AVERAGE
 
     ; Store least significant bytes
     red_byte = red_avg & %11111111
     green_byte = green_avg & %11111111
     blue_byte = blue_avg & %11111111
-    transparent_byte = transparent_avg & %11111111
+    white_byte = white_avg & %11111111
 
     ; Fill extra_byte with 9th and 10th bits of each RGBT
     extra_byte = red_avg & %1100000000 / 256
     extra_byte = green_avg & %1100000000 / 64 + extra_byte
     extra_byte = blue_avg & %1100000000 / 16 + extra_byte
-    extra_byte = transparent_avg & %1100000000 / 4 + extra_byte
+    extra_byte = white_avg & %1100000000 / 4 + extra_byte
 
     ; Write data to eprom
     read REGISTER_LAST_SAVE_WORD, WORD index
-    hi2cout index, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+    hi2cout index, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
     nap 0 ; Needs a delay or else ocassionally seems to glitch writes
 
 
@@ -261,9 +261,9 @@ main:
                ", R=", #red_byte, _
                ", G=", #green_byte, _
                ", B=", #blue_byte, _
-               ", T=", transparent_byte, _
+               ", W=", #white_byte, _
                ", E=", #extra_byte, _
-               ", F=", flag, 13)
+               ", F=", #flag, 13)
         gosub low_speed
     #endif
 
@@ -281,7 +281,10 @@ main:
 
 low_power_and_delay:
     ; Save power and sleep
-    sleep 2 ; 1 = 2.3sec watchdog timer
+    sleep 2 ; 4.6sec watchdog timer
+    ;sleep 1 ; 2.3sec watchdog timer <---------- fill up memory quickly for testing
+    ;nap 6 ; 1.1s watchdog timer <---------- fill up memory quickly for testing
+    ;nap 5 ; ~500ms watchdog timer <---------- fill up memory quickly for testing
     return
 
 check_user_button:
@@ -406,7 +409,7 @@ display_status:
     calibadc10 tmp
     tmp = 52378 / tmp * 2
     sertxd("Batttey: ", #tmp, "0mV", 13)
-    sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", T=", #transparent, 13)
+    sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", W=", #white, 13)
     return
 
 dump_data_and_reset_pointer:
@@ -416,8 +419,8 @@ dump_data_and_reset_pointer:
 	    index = index - BYTES_PER_RECORD
     endif
     for tmp = 0 to index step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     gosub reset_pointer
@@ -430,8 +433,8 @@ dump_data:
 	    index = index - BYTES_PER_RECORD
     endif
     for tmp = 0 to index step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     return
@@ -439,8 +442,8 @@ dump_data:
 dump_all_eprom_data:
     ; Debug output all eprom data
     for tmp = 0 to LAST_VALID_RECORD step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, transparent_byte, extra_byte, flag)
+        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
+        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
     next tmp
     sertxd("eof")
     return
