@@ -271,7 +271,7 @@ main:
 
     ; Increment and write position to micro eprom (mem bytes = 65536)
 	if index < LAST_VALID_RECORD then
-        index = index + 6
+        index = index + BYTES_PER_RECORD
     else
         index = 0
     endif
