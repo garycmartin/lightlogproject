@@ -543,6 +543,7 @@ display_status:
 
 dump_data:
     ; Output data oldest to newest
+    gosub display_status
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp
     if tmp > 0 then
         ; Dump end block of memory first if memory has wrapped one or more times
@@ -554,6 +555,7 @@ dump_data:
 
 dump_all_eprom_data:
     ; Debug output all eprom data in memory order
+    gosub display_status
     gosub dump_up_to_index:
     gosub dump_from_index_to_end
     sertxd("data_eof")
