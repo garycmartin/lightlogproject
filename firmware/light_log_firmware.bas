@@ -129,7 +129,7 @@ init:
     symbol REGISTER_20KLUX_WHITE_WORD = 45
 
     symbol REGISTER_LIGHT_GOAL_WORD = 47
-    symbol REGISTER_LIGHT_COUNTER_WORD = 49
+    symbol REGISTER_DAY_PHASE_WORD = 49
 
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
@@ -251,14 +251,14 @@ main:
     end_goal_update:
 
     ; Keep (rough) track of daily cycle
-    read REGISTER_LIGHT_COUNTER_WORD, word tmp
+    read REGISTER_DAY_PHASE_WORD, word tmp
     tmp = tmp + 1
     if tmp > 1440 then
         ; Reset goal and counter cycle every 1440 min
         tmp = 0
         write REGISTER_LIGHT_GOAL_WORD, word tmp
     endif
-    write REGISTER_LIGHT_COUNTER_WORD, word tmp
+    write REGISTER_DAY_PHASE_WORD, word tmp
 
     ; Store least significant bytes
     red_byte = red_avg     & %11111111
@@ -500,8 +500,8 @@ display_status:
     sertxd("20KluxWhite:", #tmp, 13)
     read REGISTER_LIGHT_GOAL_WORD, word tmp
     sertxd("LightGoal:", #tmp, 13)
-    read REGISTER_LIGHT_COUNTER_WORD, word tmp
-    sertxd("LightCounter:", #tmp, 13)
+    read REGISTER_DAY_PHASE_WORD, word tmp
+    sertxd("Phase:", #tmp, 13)
     calibadc10 tmp
     tmp = 52378 / tmp * 2
     sertxd("Batttey:", #tmp, "0mV", 13)
