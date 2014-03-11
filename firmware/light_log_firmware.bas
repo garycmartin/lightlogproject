@@ -484,60 +484,61 @@ display_status:
     read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
     sertxd("Unique_ID:", #tmp)
     read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-    sertxd(",", #tmp, 13)
+    sertxd(",", #tmp, ";")
 	read REGISTER_HARDWARE_VERSION_BYTE, tmp
-    sertxd("Hardware:", #tmp, 13)
-    sertxd("Firmware:", #FIRMWARE_VERSION, 13)
+    sertxd("Hardware:", #tmp, ";")
+    sertxd("Firmware:", #FIRMWARE_VERSION, ";")
     read REGISTER_REBOOT_COUNT_WORD, word tmp
-    sertxd("RebootCount:", #tmp, 13)
+    sertxd("RebootCount:", #tmp, ";")
     read REGISTER_LAST_SAVE_WORD, word index
-    sertxd("MemoryPointer:", #index, 13)
+    sertxd("MemoryPointer:", #index, ";")
     read REGISTER_MEMORY_WRAPPED_WORD, word index
-    sertxd("MemoryWrapped:", #index, 13)
+    sertxd("MemoryWrapped:", #index, ";")
 	read REGISTER_LOG_START_TIME_WORD1, word tmp
     sertxd("TimeStart:", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
-    sertxd(",", #tmp, 13)
+    sertxd(",", #tmp, ";")
     read REGISTER_2_5KLUX_RED_WORD, word tmp
-    sertxd("2.5KluxR:", #tmp, 13)
+    sertxd("2.5KluxR:", #tmp, ";")
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp
-    sertxd("2.5KluxG:", #tmp, 13)
+    sertxd("2.5KluxG:", #tmp, ";")
     read REGISTER_2_5KLUX_BLUE_WORD, word tmp
-    sertxd("2.5KluxB:", #tmp, 13)
+    sertxd("2.5KluxB:", #tmp, ";")
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    sertxd("2.5KluxW:", #tmp, 13)
+    sertxd("2.5KluxW:", #tmp, ";")
     read REGISTER_5KLUX_RED_WORD, word tmp
-    sertxd("5KluxR:", #tmp, 13)
+    sertxd("5KluxR:", #tmp, ";")
     read REGISTER_5KLUX_GREEN_WORD, word tmp
-    sertxd("5KluxG:", #tmp, 13)
+    sertxd("5KluxG:", #tmp, ";")
     read REGISTER_5KLUX_BLUE_WORD, word tmp
-    sertxd("5KluxB:", #tmp, 13)
+    sertxd("5KluxB:", #tmp, ";")
     read REGISTER_5KLUX_WHITE_WORD, word tmp
-    sertxd("5KluxW:", #tmp, 13)
+    sertxd("5KluxW:", #tmp, ";")
     read REGISTER_10KLUX_RED_WORD, word tmp
-    sertxd("10KluxR:", #tmp, 13)
+    sertxd("10KluxR:", #tmp, ";")
     read REGISTER_10KLUX_GREEN_WORD, word tmp
-    sertxd("10KluxG:", #tmp, 13)
+    sertxd("10KluxG:", #tmp, ";")
     read REGISTER_10KLUX_BLUE_WORD, word tmp
-    sertxd("10KluxB:", #tmp, 13)
+    sertxd("10KluxB:", #tmp, ";")
     read REGISTER_10KLUX_WHITE_WORD, word tmp
-    sertxd("10KluxW:", #tmp, 13)
+    sertxd("10KluxW:", #tmp, ";")
     read REGISTER_20KLUX_RED_WORD, word tmp
-    sertxd("20KluxR:", #tmp, 13)
+    sertxd("20KluxR:", #tmp, ";")
     read REGISTER_20KLUX_GREEN_WORD, word tmp
-    sertxd("20KluxG:", #tmp, 13)
+    sertxd("20KluxG:", #tmp, ";")
     read REGISTER_20KLUX_BLUE_WORD, word tmp
-    sertxd("20KluxB:", #tmp, 13)
+    sertxd("20KluxB:", #tmp, ";")
     read REGISTER_20KLUX_WHITE_WORD, word tmp
-    sertxd("20KluxW:", #tmp, 13)
+    sertxd("20KluxW:", #tmp, ";")
     read REGISTER_LIGHT_GOAL_WORD, word tmp
-    sertxd("Goal:", #tmp, 13)
+    sertxd("Goal:", #tmp, ";")
     read REGISTER_DAY_PHASE_WORD, word tmp
-    sertxd("Phase:", #tmp, 13)
+    sertxd("Phase:", #tmp, ";")
     calibadc10 tmp
     tmp = 52378 / tmp * 2
-    sertxd("Batttey:", #tmp, "0mV", 13)
-    sertxd("SensorsRGBW:", #red, ",", #green, ",", #blue, ",", #white, 13)
+    sertxd("Batttey:", #tmp, "0mV", ";")
+    sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
+    sertxd("head_eof")
     return
 
 dump_data:
