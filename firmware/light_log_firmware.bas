@@ -92,8 +92,8 @@ init:
     ; Button C.3 internal pullup resistor
     pullup %0000100000000000
 
-    ; 5 = default, 63 = max (due to word int maths and avg)
-    symbol SAMPLES_PER_AVERAGE = 5
+    ; 63 = max (due to word int maths and avg overflow risk)
+    symbol SAMPLES_PER_AVERAGE = 15
 
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
@@ -223,8 +223,10 @@ main:
             gosub low_speed
         #endif
 
+        gosub low_power_delay
         gosub check_user_button
         gosub low_power_delay
+        gosub check_user_button
     next sample_loop
 
     ; Calculate averages
@@ -279,10 +281,8 @@ main:
 
 low_power_delay:
     ; Save power and sleep
-    sleep 2 ; 4.6sec watchdog timer
-    ;sleep 1 ; 2.3sec watchdog timer <---------- fill up memory quickly for testing
-    ;nap 6 ; 1.1s watchdog timer <---------- fill up memory quickly for testing
-    ;nap 5 ; ~500ms watchdog timer <---------- fill up memory quickly for testing
+    ;nap 8 ; ~4sec
+    nap 6 : nap 5 : nap 4 : nap 0 : nap 0 ; ~2sec
     return
 
 check_user_button:
