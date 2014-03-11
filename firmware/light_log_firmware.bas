@@ -131,12 +131,15 @@ init:
     symbol REGISTER_LIGHT_GOAL_WORD = 47
     symbol REGISTER_DAY_PHASE_WORD = 49
 
+    symbol REGISTER_MEMORY_WRAPPED_WORD = 51
+
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
     symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
     symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
     symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
     symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
+    symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
 
     symbol red = w0
     symbol green = w1
@@ -296,9 +299,13 @@ main:
 
     flag = FLAG_OK ; Clear any flag states
 
-    ; Increment and write position to micro eprom (mem bytes = 65536)
+    ; Increment and write current position to micro eprom (mem bytes = 65536)
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
 	if index >= LAST_VALID_RECORD then
         index = 0
+        ; Keep track of memory wrapps
+        tmp = tmp + 1
+        write REGISTER_MEMORY_WRAPPED_WORD, word tmp
     endif
     write REGISTER_LAST_SAVE_WORD, word index
 
@@ -485,6 +492,8 @@ display_status:
     sertxd("RebootCount:", #tmp, 13)
     read REGISTER_LAST_SAVE_WORD, word index
     sertxd("MemoryPointer:", #index, 13)
+    read REGISTER_MEMORY_WRAPPED_WORD, word index
+    sertxd("MemoryWrapped:", #index, 13)
 	read REGISTER_LOG_START_TIME_WORD1, word tmp
     sertxd("TimeStart:", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
@@ -532,30 +541,49 @@ display_status:
     return
 
 dump_data:
-    ; Debug output data
+    ; Output data oldest to newest
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
+    if tmp > 0 then
+        ; Dump end block of memory first if memory has wrapped one or more times
+        gosub dump_from_index_to_end
+    endif
+    gosub dump_up_to_index
+    sertxd("data_eof")
+    return
+
+dump_all_eprom_data:
+    ; Debug output all eprom data in memory order
+    gosub dump_up_to_index:
+    gosub dump_from_index_to_end
+    sertxd("data_eof")
+    return
+
+dump_up_to_index:
     read REGISTER_LAST_SAVE_WORD, word index
     if index != 0 then
-	    index = index - BYTES_PER_RECORD
+	    index = index - BYTES_PER_RECORD - 1
     endif
     for tmp = 0 to index
         hi2cin tmp, (red_byte)
         sertxd (red_byte)
     next tmp
-    sertxd("eof")
     return
 
-dump_all_eprom_data:
-    ; Debug output all eprom data
-    for tmp = 0 to LAST_VALID_RECORD step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
+dump_from_index_to_end:
+    read REGISTER_LAST_SAVE_WORD, word index
+    if index != 0 then
+	    index = index - BYTES_PER_RECORD
+    endif
+    for tmp = index to LAST_VALID_BYTE
+        hi2cin tmp, (red_byte)
+        sertxd (red_byte)
     next tmp
-    sertxd("eof")
     return
 
 reset_pointer:
-    index = 0 ; reset pointer back to start of mem
+    index = 0 ; reset pointers back to start of mem
     write REGISTER_LAST_SAVE_WORD, word index
+    write REGISTER_MEMORY_WRAPPED_WORD, word index
     return
 
 reset_reboot_counter:
@@ -580,6 +608,7 @@ first_boot_init:
     write REGISTER_LAST_SAVE_WORD, word tmp
     write REGISTER_LOG_START_TIME_WORD1, word tmp
     write REGISTER_LOG_START_TIME_WORD2, word tmp
+    write REGISTER_MEMORY_WRAPPED_WORD, word tmp
     gosub zero_light_goal
     gosub zero_day_phase
 
