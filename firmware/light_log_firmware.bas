@@ -98,7 +98,7 @@ init:
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
     symbol FLAG_BLOCKED = %01000000
-    symbol FLAG_TBA = %10000000
+    symbol FLAG_BUTTON = %10000000
 
     symbol FIRST_BOOT_PASS_WORD = %1110010110100111
 
@@ -301,6 +301,7 @@ check_user_button:
         gosub display_status
         gosub low_speed
 
+        flag = flag | FLAG_BUTTON
         gosub check_serial_comms
 
         reconnect
