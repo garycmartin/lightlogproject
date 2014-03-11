@@ -451,21 +451,21 @@ pulse_led:
     return
 
 display_status:
-	read REGISTER_HARDWARE_VERSION_BYTE, tmp
-    sertxd("Hardware version: ", #tmp, 13)
     read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-    sertxd("Unique hardware ID: ", #tmp)
+    sertxd("Unique_ID:", #tmp)
     read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-    sertxd(", ", #tmp, 13)
-    sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
+    sertxd(",", #tmp, 13)
+	read REGISTER_HARDWARE_VERSION_BYTE, tmp
+    sertxd("Hardware:", #tmp, 13)
+    sertxd("Firmware:", #FIRMWARE_VERSION, 13)
     read REGISTER_REBOOT_COUNT_WORD, word tmp
-    sertxd("Device reboot count: ", #tmp, 13)
+    sertxd("RebootCount:", #tmp, 13)
     read REGISTER_LAST_SAVE_WORD, word index
-    sertxd("Mem pointer: ", #index, "/65536", 13)
+    sertxd("MemoryPointer:", #index, 13)
 	read REGISTER_LOG_START_TIME_WORD1, word tmp
-    sertxd("Log start: ", #tmp)
+    sertxd("TimeStart:", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
-    sertxd(", ", #tmp, 13)
+    sertxd(",", #tmp, 13)
     read REGISTER_2_5KLUX_RED_WORD, word tmp
     sertxd("2.5KluxRed:", #tmp, 13)
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp
@@ -504,10 +504,8 @@ display_status:
     sertxd("LightCounter:", #tmp, 13)
     calibadc10 tmp
     tmp = 52378 / tmp * 2
-    sertxd("Batttey: ", #tmp, "0mV", 13)
-    sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", W=", #white, 13)
-    return
-
+    sertxd("Batttey:", #tmp, "0mV", 13)
+    sertxd("SensorsRGBW:", #red, ",", #green, ",", #blue, ",", #white, 13)
     return
 
 dump_data:
