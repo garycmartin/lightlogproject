@@ -166,7 +166,7 @@ init:
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp
     if tmp != FIRST_BOOT_PASS_WORD then
         gosub first_boot_init
-        gosub zero_calibration; !!!
+        gosub default_light_calibration
 	endif
 
     ; Keep a count of device reboots
@@ -592,21 +592,40 @@ first_boot_init:
 
 zero_calibration:
     tmp = 0
+default_light_calibration:
+    ; Default calibration using full spectrum white light measured with
+    ; device inside case, behind RGB & clear light gels, and at room temp.
+    tmp = 529
     write REGISTER_2_5KLUX_RED_WORD, word tmp
+    tmp = 375
     write REGISTER_2_5KLUX_GREEN_WORD, word tmp
+    tmp = 274
     write REGISTER_2_5KLUX_BLUE_WORD, word tmp
+    tmp = 748
     write REGISTER_2_5KLUX_WHITE_WORD, word tmp
+    tmp = 611
     write REGISTER_5KLUX_RED_WORD, word tmp
+    tmp = 481
     write REGISTER_5KLUX_GREEN_WORD, word tmp
+    tmp = 349
     write REGISTER_5KLUX_BLUE_WORD, word tmp
+    tmp = 811
     write REGISTER_5KLUX_WHITE_WORD, word tmp
+    tmp = 717
     write REGISTER_10KLUX_RED_WORD, word tmp
+    tmp = 617
     write REGISTER_10KLUX_GREEN_WORD, word tmp
+    tmp = 481
     write REGISTER_10KLUX_BLUE_WORD, word tmp
+    tmp = 854
     write REGISTER_10KLUX_WHITE_WORD, word tmp
+    tmp = 783
     write REGISTER_20KLUX_RED_WORD, word tmp
+    tmp = 700
     write REGISTER_20KLUX_GREEN_WORD, word tmp
+    tmp = 581
     write REGISTER_20KLUX_BLUE_WORD, word tmp
+    tmp = 872
     write REGISTER_20KLUX_WHITE_WORD, word tmp
     return
 
