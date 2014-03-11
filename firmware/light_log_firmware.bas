@@ -250,7 +250,7 @@ main:
 
     end_goal_update:
 
-    ; Keep (rough) track of daily cycle
+    ; Keep track of day phase cycle
     read REGISTER_DAY_PHASE_WORD, word tmp
     tmp = tmp + 1
     if tmp > 1440 then
@@ -324,24 +324,38 @@ check_user_button:
     if EVENT_BUTTON = 0 then
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
+
+        ; Allow program upload during a button press
         reconnect
+
+        ; User feedback based on light goal
         read REGISTER_LIGHT_GOAL_WORD, word tmp
         if tmp > 3000 then
+            ; Minimim recommended light goal reached
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
+
         elseif tmp > 2000 then
+            ; Two thirds of light goal reached
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
+
         elseif tmp > 1000 then
+            ; Third of light goal reached
             gosub pulse_led
             gosub pulse_led
+
         else
+            ; Less than a third of light goal
             gosub pulse_led
         endif
+
+        ; Prevent program upload (saves power)
         disconnect
+
     endif
     return
 
