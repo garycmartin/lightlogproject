@@ -322,13 +322,8 @@ check_user_button:
     #endif
 
     if EVENT_BUTTON = 0 then
-        gosub high_speed
-        gosub display_status
-        gosub low_speed
-
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
-
         reconnect
         read REGISTER_LIGHT_GOAL_WORD, word tmp
         if tmp > 3000 then
