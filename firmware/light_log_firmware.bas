@@ -165,41 +165,8 @@ init:
 	; First boot check
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp
     if tmp != FIRST_BOOT_PASS_WORD then
-        write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
-        tmp = 0
-        write REGISTER_REBOOT_COUNT_WORD, word tmp
-        write REGISTER_LAST_SAVE_WORD, word tmp
-        write REGISTER_LOG_START_TIME_WORD1, word tmp
-        write REGISTER_LOG_START_TIME_WORD2, word tmp
-
-        ; Generate unique hardware id (seed from sensor and battery readings)
-        high SENSOR_POWER
-        readadc10 SENSOR_RED, red
-        readadc10 SENSOR_GREEN, green
-        readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_WHITE, white
-        low SENSOR_POWER
-        calibadc10 tmp
-        tmp = red * green * blue * white * tmp
-        random tmp
-        write REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-        tmp = red * green * blue * white * tmp
-        random tmp
-        write REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-
-        #ifdef DEBUG_FIRST_BOOT
-            gosub high_speed
-            sertxd("*** First boot ***", 13)
-            read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-            sertxd("Unique HW ID: ", #tmp)
-            read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-            sertxd(", ", #tmp, 13)
-            gosub low_speed
-        #endif
-
-        ; Mark first boot as passed
-        tmp = FIRST_BOOT_PASS_WORD
-		write REGISTER_FIRST_BOOT_PASS_WORD, word tmp
+        gosub first_boot_init
+        gosub zero_calibration; !!!
 	endif
 
     ; Keep a count of device reboots
@@ -610,6 +577,46 @@ erase_all_data:
     next tmp
     gosub reset_pointer
     gosub reset_reboot_counter
+    return
+
+first_boot_init:
+    write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
+    tmp = 0
+    write REGISTER_REBOOT_COUNT_WORD, word tmp
+    write REGISTER_LAST_SAVE_WORD, word tmp
+    write REGISTER_LOG_START_TIME_WORD1, word tmp
+    write REGISTER_LOG_START_TIME_WORD2, word tmp
+    write REGISTER_LIGHT_GOAL_WORD, word tmp
+    write REGISTER_LIGHT_COUNTER_WORD, word tmp
+
+    ; Generate unique hardware id (seed from sensor and battery readings)
+    high SENSOR_POWER
+    readadc10 SENSOR_RED, red
+    readadc10 SENSOR_GREEN, green
+    readadc10 SENSOR_BLUE, blue
+    readadc10 SENSOR_WHITE, white
+    low SENSOR_POWER
+    calibadc10 tmp
+    tmp = red * green * blue * white * tmp
+    random tmp
+    write REGISTER_UNIQUE_HW_ID_WORD1, word tmp
+    tmp = red * green * blue * white * tmp
+    random tmp
+    write REGISTER_UNIQUE_HW_ID_WORD2, word tmp
+
+    ; Mark first boot as passed
+    tmp = FIRST_BOOT_PASS_WORD
+    write REGISTER_FIRST_BOOT_PASS_WORD, word tmp
+
+    #ifdef DEBUG_FIRST_BOOT
+        gosub high_speed
+        sertxd("First boot", 13)
+        read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
+        sertxd("Unique HW ID: ", #tmp)
+        read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
+        sertxd(", ", #tmp, 13)
+        gosub low_speed
+    #endif
     return
 
 zero_calibration:
