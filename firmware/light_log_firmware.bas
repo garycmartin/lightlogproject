@@ -467,39 +467,39 @@ display_status:
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
     sertxd(",", #tmp, 13)
     read REGISTER_2_5KLUX_RED_WORD, word tmp
-    sertxd("2.5KluxRed:", #tmp, 13)
+    sertxd("2.5KluxR:", #tmp, 13)
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp
-    sertxd("2.5KluxGreen:", #tmp, 13)
+    sertxd("2.5KluxG:", #tmp, 13)
     read REGISTER_2_5KLUX_BLUE_WORD, word tmp
-    sertxd("2.5KluxBlue:", #tmp, 13)
+    sertxd("2.5KluxB:", #tmp, 13)
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    sertxd("2.5KluxWhite:", #tmp, 13)
+    sertxd("2.5KluxW:", #tmp, 13)
     read REGISTER_5KLUX_RED_WORD, word tmp
-    sertxd("5KluxRed:", #tmp, 13)
+    sertxd("5KluxR:", #tmp, 13)
     read REGISTER_5KLUX_GREEN_WORD, word tmp
-    sertxd("5KluxGreen:", #tmp, 13)
+    sertxd("5KluxG:", #tmp, 13)
     read REGISTER_5KLUX_BLUE_WORD, word tmp
-    sertxd("5KluxBlue:", #tmp, 13)
+    sertxd("5KluxB:", #tmp, 13)
     read REGISTER_5KLUX_WHITE_WORD, word tmp
-    sertxd("5KluxWhite:", #tmp, 13)
+    sertxd("5KluxW:", #tmp, 13)
     read REGISTER_10KLUX_RED_WORD, word tmp
-    sertxd("10KluxRed:", #tmp, 13)
+    sertxd("10KluxR:", #tmp, 13)
     read REGISTER_10KLUX_GREEN_WORD, word tmp
-    sertxd("10KluxGreen:", #tmp, 13)
+    sertxd("10KluxG:", #tmp, 13)
     read REGISTER_10KLUX_BLUE_WORD, word tmp
-    sertxd("10KluxBlue:", #tmp, 13)
+    sertxd("10KluxB:", #tmp, 13)
     read REGISTER_10KLUX_WHITE_WORD, word tmp
-    sertxd("10KluxWhite:", #tmp, 13)
+    sertxd("10KluxW:", #tmp, 13)
     read REGISTER_20KLUX_RED_WORD, word tmp
-    sertxd("20KluxRed:", #tmp, 13)
+    sertxd("20KluxR:", #tmp, 13)
     read REGISTER_20KLUX_GREEN_WORD, word tmp
-    sertxd("20KluxGreen:", #tmp, 13)
+    sertxd("20KluxG:", #tmp, 13)
     read REGISTER_20KLUX_BLUE_WORD, word tmp
-    sertxd("20Klux Blue:", #tmp, 13)
+    sertxd("20Klux B:", #tmp, 13)
     read REGISTER_20KLUX_WHITE_WORD, word tmp
-    sertxd("20KluxWhite:", #tmp, 13)
+    sertxd("20KluxW:", #tmp, 13)
     read REGISTER_LIGHT_GOAL_WORD, word tmp
-    sertxd("LightGoal:", #tmp, 13)
+    sertxd("Goal:", #tmp, 13)
     read REGISTER_DAY_PHASE_WORD, word tmp
     sertxd("Phase:", #tmp, 13)
     calibadc10 tmp
@@ -583,7 +583,7 @@ first_boot_init:
         gosub high_speed
         sertxd("First boot", 13)
         read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-        sertxd("Unique HW ID: ", #tmp)
+        sertxd("Unique ID: ", #tmp)
         read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
         sertxd(", ", #tmp, 13)
         gosub low_speed
