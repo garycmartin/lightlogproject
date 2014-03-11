@@ -46,8 +46,9 @@ POSSIBILITY OF SUCH DAMAGE.
                                   –––––
 
 TODO:
- - Software calibrate the sensor response curves as part of first init tests
- - Finishing adding code for clear LDR sensor
+ - Use 2 characters for comms commands
+ - Use more characters than 'eof' to mark end of files
+ - First boot calibrate/test timer best we can?
  - When full, compress data 50% and double number of samples per average and continue
  - Extend two way serial protocol:
    - log start time (and transmit it during sync)
@@ -60,7 +61,6 @@ TODO:
  - HW: Move B.1 for use of hardware serial in?
  - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
  - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
- - Use a button to interrupt, short press for marker, long hold for reboot
 #endrem
 
 #no_data ; <---- test this (re-programming should not zap eprom data)
