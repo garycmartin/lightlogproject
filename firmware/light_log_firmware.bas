@@ -394,6 +394,12 @@ check_serial_comms:
     elseif ser_in_byte = "k" then
         gosub calibrate_20Klux
 
+    elseif ser_in_byte = "l" then
+        gosub zero_light_goal
+
+    elseif ser_in_byte = "m" then
+        gosub zero_day_phase
+
     elseif ser_in_byte = "z" then
         gosub first_boot_init
 
@@ -571,8 +577,8 @@ first_boot_init:
     write REGISTER_LAST_SAVE_WORD, word tmp
     write REGISTER_LOG_START_TIME_WORD1, word tmp
     write REGISTER_LOG_START_TIME_WORD2, word tmp
-    write REGISTER_LIGHT_GOAL_WORD, word tmp
-    write REGISTER_LIGHT_COUNTER_WORD, word tmp
+    gosub zero_light_goal
+    gosub zero_day_phase
 
     ; Generate unique hardware id (seed from sensor and battery readings)
     high SENSOR_POWER
@@ -604,8 +610,16 @@ first_boot_init:
     #endif
     return
 
-zero_calibration:
+zero_light_goal:
     tmp = 0
+    write REGISTER_LIGHT_GOAL_WORD, word tmp
+    return
+
+zero_day_phase:
+    tmp = 0
+    write REGISTER_DAY_PHASE_WORD, word tmp
+    return
+
 default_light_calibration:
     ; Default calibration using full spectrum white light measured with
     ; device inside case, behind RGB & clear light gels, and at room temp.
