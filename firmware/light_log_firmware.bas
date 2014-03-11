@@ -46,15 +46,13 @@ POSSIBILITY OF SUCH DAMAGE.
                                   –––––
 
 TODO:
- - Use 2 characters for comms commands
- - Use more characters than 'eof' to mark end of files
- - First boot calibrate/test timer best we can?
  - When full, compress data 50% and double number of samples per average and continue
  - Extend two way serial protocol:
    - log start time (and transmit it during sync)
    - generate device id for first boot (and transmit it during sync)
    - report hardware version in status (store in picaxe rom, defined during first run)
    - add a validate/checksum to sync process
+ - First boot calibrate/test timer best we can?
  - Calculate and store average samples varience (indication of activity)?
  - HW: LED to C.2 would allow pwmout command for dimming control
  - HW: Use external RTC?
