@@ -353,9 +353,6 @@ check_serial_comms:
     if ser_in_byte = "a" then
         gosub display_status
 
-    elseif ser_in_byte = "b" then
-        gosub dump_data_and_reset_pointer
-
     elseif ser_in_byte = "c" then
         gosub dump_data
 
@@ -511,18 +508,6 @@ display_status:
     sertxd("Sensors: R=", #red, ", G=", #green, ", B=", #blue, ", W=", #white, 13)
     return
 
-dump_data_and_reset_pointer:
-    ; Output eprom data and reset pointer
-    read REGISTER_LAST_SAVE_WORD, word index
-    if index != 0 then
-	    index = index - BYTES_PER_RECORD
-    endif
-    for tmp = 0 to index step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
-    next tmp
-    sertxd("eof")
-    gosub reset_pointer
     return
 
 dump_data:
