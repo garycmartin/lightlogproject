@@ -510,13 +510,13 @@ display_status:
 
 dump_data:
     ; Debug output data
-    read REGISTER_LAST_SAVE_WORD, WORD index
+    read REGISTER_LAST_SAVE_WORD, word index
     if index != 0 then
 	    index = index - BYTES_PER_RECORD
     endif
-    for tmp = 0 to index step BYTES_PER_RECORD
-        hi2cin tmp, (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
-        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, flag)
+    for tmp = 0 to index
+        hi2cin tmp, (red_byte)
+        sertxd (red_byte)
     next tmp
     sertxd("eof")
     return
