@@ -527,7 +527,7 @@ display_status:
     read REGISTER_20KLUX_GREEN_WORD, word tmp
     sertxd("20KluxG:", #tmp, 13)
     read REGISTER_20KLUX_BLUE_WORD, word tmp
-    sertxd("20Klux B:", #tmp, 13)
+    sertxd("20KluxB:", #tmp, 13)
     read REGISTER_20KLUX_WHITE_WORD, word tmp
     sertxd("20KluxW:", #tmp, 13)
     read REGISTER_LIGHT_GOAL_WORD, word tmp
