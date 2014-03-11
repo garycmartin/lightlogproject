@@ -143,14 +143,14 @@ init:
     low SENSOR_POWER
 
 	; First boot check
-    read REGISTER_FIRST_BOOT_PASS_WORD, WORD tmp
+    read REGISTER_FIRST_BOOT_PASS_WORD, word tmp
     if tmp != FIRST_BOOT_PASS_WORD then
         write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
         tmp = 0
-        write REGISTER_REBOOT_COUNT_WORD, WORD tmp
-        write REGISTER_LAST_SAVE_WORD, WORD tmp
-        write REGISTER_LOG_START_TIME_WORD1, WORD tmp
-        write REGISTER_LOG_START_TIME_WORD2, WORD tmp
+        write REGISTER_REBOOT_COUNT_WORD, word tmp
+        write REGISTER_LAST_SAVE_WORD, word tmp
+        write REGISTER_LOG_START_TIME_WORD1, word tmp
+        write REGISTER_LOG_START_TIME_WORD2, word tmp
 
         ; Generate unique hardware id (seed from sensor and battery readings)
         high SENSOR_POWER
@@ -162,30 +162,30 @@ init:
         calibadc10 tmp
         tmp = red * green * blue * white * tmp
         random tmp
-        write REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+        write REGISTER_UNIQUE_HW_ID_WORD1, word tmp
         tmp = red * green * blue * white * tmp
         random tmp
-        write REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
+        write REGISTER_UNIQUE_HW_ID_WORD2, word tmp
 
         #ifdef DEBUG_FIRST_BOOT
             gosub high_speed
             sertxd("*** First boot ***", 13)
-            read REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+            read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
             sertxd("Unique HW ID: ", #tmp)
-            read REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
+            read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
             sertxd(", ", #tmp, 13)
             gosub low_speed
         #endif
 
         ; Mark first boot as passed
         tmp = FIRST_BOOT_PASS_WORD
-		write REGISTER_FIRST_BOOT_PASS_WORD, WORD tmp
+		write REGISTER_FIRST_BOOT_PASS_WORD, word tmp
 	endif
 
     ; Keep a count of device reboots
-    read REGISTER_REBOOT_COUNT_WORD, WORD tmp
+    read REGISTER_REBOOT_COUNT_WORD, word tmp
     tmp = tmp + 1
-    write REGISTER_REBOOT_COUNT_WORD, WORD tmp
+    write REGISTER_REBOOT_COUNT_WORD, word tmp
 
     gosub power_on_animation
 
@@ -246,7 +246,7 @@ main:
     extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
     ; Write data to eprom
-    read REGISTER_LAST_SAVE_WORD, WORD index
+    read REGISTER_LAST_SAVE_WORD, word index
     hi2cout index, (red_byte, green_byte)
 	index = index + 2
     hi2cout index, (blue_byte, white_byte)
@@ -273,7 +273,7 @@ main:
 	if index >= LAST_VALID_RECORD then
         index = 0
     endif
-    write REGISTER_LAST_SAVE_WORD, WORD index
+    write REGISTER_LAST_SAVE_WORD, word index
 
     goto main
 
@@ -389,18 +389,18 @@ pulse_led:
 display_status:
 	read REGISTER_HARDWARE_VERSION_BYTE, tmp
     sertxd("Hardware version: ", #tmp, 13)
-    read REGISTER_UNIQUE_HW_ID_WORD1, WORD tmp
+    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
     sertxd("Unique hardware ID: ", #tmp)
-    read REGISTER_UNIQUE_HW_ID_WORD2, WORD tmp
+    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
     sertxd(", ", #tmp, 13)
     sertxd("Firmware version: ", #FIRMWARE_VERSION, 13)
-    read REGISTER_REBOOT_COUNT_WORD, WORD tmp
+    read REGISTER_REBOOT_COUNT_WORD, word tmp
     sertxd("Device reboot count: ", #tmp, 13)
-    read REGISTER_LAST_SAVE_WORD, WORD index
+    read REGISTER_LAST_SAVE_WORD, word index
     sertxd("Mem pointer: ", #index, "/65536", 13)
-	read REGISTER_LOG_START_TIME_WORD1, WORD tmp
+	read REGISTER_LOG_START_TIME_WORD1, word tmp
     sertxd("Log start: ", #tmp)
-	read REGISTER_LOG_START_TIME_WORD2, WORD tmp
+	read REGISTER_LOG_START_TIME_WORD2, word tmp
     sertxd(", ", #tmp, 13)
     calibadc10 tmp
     tmp = 52378 / tmp * 2
@@ -410,7 +410,7 @@ display_status:
 
 dump_data_and_reset_pointer:
     ; Output eprom data and reset pointer
-    read REGISTER_LAST_SAVE_WORD, WORD index
+    read REGISTER_LAST_SAVE_WORD, word index
     if index != 0 then
 	    index = index - BYTES_PER_RECORD
     endif
@@ -446,12 +446,12 @@ dump_all_eprom_data:
 
 reset_pointer:
     index = 0 ; reset pointer back to start of mem
-    write REGISTER_LAST_SAVE_WORD, WORD index
+    write REGISTER_LAST_SAVE_WORD, word index
     return
 
 reset_reboot_counter:
     tmp = 0
-    write REGISTER_REBOOT_COUNT_WORD, WORD tmp ; reset reboot counter back to 0
+    write REGISTER_REBOOT_COUNT_WORD, word tmp ; reset reboot counter back to 0
     return
 
 erase_all_data:
