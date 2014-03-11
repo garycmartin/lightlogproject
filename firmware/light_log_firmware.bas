@@ -174,7 +174,7 @@ init:
     tmp = tmp + 1
     write REGISTER_REBOOT_COUNT_WORD, word tmp
 
-    gosub power_on_animation
+    gosub flash_led
 
     flag = FLAG_REBOOT
 
@@ -400,13 +400,6 @@ check_serial_comms:
     gosub low_speed
     return
 
-power_on_animation:
-    ; Get some attention
-    gosub pulse_led
-    gosub pulse_led
-    gosub pulse_led
-    gosub pulse_led
-    gosub pulse_led
 calibrate_2_5Klux:
     write REGISTER_2_5KLUX_RED_WORD, word red
     write REGISTER_2_5KLUX_GREEN_WORD, word green
