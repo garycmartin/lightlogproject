@@ -111,6 +111,26 @@ init:
     symbol REGISTER_LOG_START_TIME_WORD1 = 11
     symbol REGISTER_LOG_START_TIME_WORD2 = 13
 
+    symbol REGISTER_2_5KLUX_RED_WORD = 15
+    symbol REGISTER_2_5KLUX_GREEN_WORD = 17
+    symbol REGISTER_2_5KLUX_BLUE_WORD = 19
+    symbol REGISTER_2_5KLUX_WHITE_WORD = 21
+    symbol REGISTER_5KLUX_RED_WORD = 23
+    symbol REGISTER_5KLUX_GREEN_WORD = 25
+    symbol REGISTER_5KLUX_BLUE_WORD = 27
+    symbol REGISTER_5KLUX_WHITE_WORD = 29
+    symbol REGISTER_10KLUX_RED_WORD = 31
+    symbol REGISTER_10KLUX_GREEN_WORD = 33
+    symbol REGISTER_10KLUX_BLUE_WORD = 35
+    symbol REGISTER_10KLUX_WHITE_WORD = 37
+    symbol REGISTER_20KLUX_RED_WORD = 39
+    symbol REGISTER_20KLUX_GREEN_WORD = 41
+    symbol REGISTER_20KLUX_BLUE_WORD = 43
+    symbol REGISTER_20KLUX_WHITE_WORD = 45
+
+    symbol REGISTER_LIGHT_GOAL_WORD = 47
+    symbol REGISTER_LIGHT_COUNTER_WORD = 49
+
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
     symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
@@ -235,6 +255,44 @@ main:
     blue_avg = blue_avg / SAMPLES_PER_AVERAGE
     white_avg = white_avg / SAMPLES_PER_AVERAGE
 
+    ; Accumulate light for goal target
+    ; TODO: Replace with smooth function between 2.5K and 10K
+    read REGISTER_10KLUX_WHITE_WORD, word tmp
+    if white_avg >= tmp then
+        read REGISTER_LIGHT_GOAL_WORD, word tmp
+        tmp = tmp + 100
+        write REGISTER_LIGHT_GOAL_WORD, word tmp
+        goto end_goal_update
+    endif
+
+    read REGISTER_5KLUX_WHITE_WORD, word tmp
+    if white_avg >= tmp then
+        read REGISTER_LIGHT_GOAL_WORD, word tmp
+        tmp = tmp + 50
+        write REGISTER_LIGHT_GOAL_WORD, word tmp
+        goto end_goal_update
+    endif
+
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
+    if white_avg >= tmp then
+        read REGISTER_LIGHT_GOAL_WORD, word tmp
+        tmp = tmp + 25
+        write REGISTER_LIGHT_GOAL_WORD, word tmp
+        goto end_goal_update
+    endif        
+
+    end_goal_update:
+
+    ; Keep (rough) track of daily cycle
+    read REGISTER_LIGHT_COUNTER_WORD, word tmp
+    tmp = tmp + 1
+    if tmp > 1440 then
+        ; Reset goal and counter cycle every 1440 min
+        tmp = 0
+        write REGISTER_LIGHT_GOAL_WORD, word tmp
+    endif
+    write REGISTER_LIGHT_COUNTER_WORD, word tmp
+
     ; Store least significant bytes
     red_byte = red_avg     & %11111111
     green_byte = green_avg & %11111111
@@ -305,11 +363,23 @@ check_user_button:
         gosub check_serial_comms
 
         reconnect
-        gosub pulse_led
-        gosub pulse_led
-        gosub pulse_led
+        read REGISTER_LIGHT_GOAL_WORD, word tmp
+        if tmp > 3000 then
+            gosub pulse_led
+            gosub pulse_led
+            gosub pulse_led
+            gosub pulse_led
+        elseif tmp > 2000 then
+            gosub pulse_led
+            gosub pulse_led
+            gosub pulse_led
+        elseif tmp > 1000 then
+            gosub pulse_led
+            gosub pulse_led
+        else
+            gosub pulse_led
+        endif
         disconnect
-
     endif
     return
 
@@ -339,6 +409,21 @@ check_serial_comms:
     elseif ser_in_byte = "g" then
         gosub erase_all_data
 
+    elseif ser_in_byte = "h" then
+        gosub calibrate_2_5Klux
+
+    elseif ser_in_byte = "i" then
+        gosub calibrate_5Klux
+
+    elseif ser_in_byte = "j" then
+        gosub calibrate_10Klux
+
+    elseif ser_in_byte = "k" then
+        gosub calibrate_20Klux
+
+    elseif ser_in_byte = "z" then
+        gosub first_boot_init
+
     else
         sertxd("Unknown command: ", ser_in_byte, 13)
 
@@ -355,6 +440,32 @@ power_on_animation:
     gosub pulse_led
     gosub pulse_led
     gosub pulse_led
+calibrate_2_5Klux:
+    write REGISTER_2_5KLUX_RED_WORD, word red
+    write REGISTER_2_5KLUX_GREEN_WORD, word green
+    write REGISTER_2_5KLUX_BLUE_WORD, word blue
+    write REGISTER_2_5KLUX_WHITE_WORD, word white
+    return
+
+calibrate_5Klux:
+    write REGISTER_5KLUX_RED_WORD, word red
+    write REGISTER_5KLUX_GREEN_WORD, word green
+    write REGISTER_5KLUX_BLUE_WORD, word blue
+    write REGISTER_5KLUX_WHITE_WORD, word white
+    return
+
+calibrate_10Klux:
+    write REGISTER_10KLUX_RED_WORD, word red
+    write REGISTER_10KLUX_GREEN_WORD, word green
+    write REGISTER_10KLUX_BLUE_WORD, word blue
+    write REGISTER_10KLUX_WHITE_WORD, word white
+    return
+
+calibrate_20Klux:
+    write REGISTER_20KLUX_RED_WORD, word red
+    write REGISTER_20KLUX_GREEN_WORD, word green
+    write REGISTER_20KLUX_BLUE_WORD, word blue
+    write REGISTER_20KLUX_WHITE_WORD, word white
     return
 
 flash_led:
@@ -403,6 +514,42 @@ display_status:
     sertxd("Log start: ", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
     sertxd(", ", #tmp, 13)
+    read REGISTER_2_5KLUX_RED_WORD, word tmp
+    sertxd("2.5KluxRed:", #tmp, 13)
+    read REGISTER_2_5KLUX_GREEN_WORD, word tmp
+    sertxd("2.5KluxGreen:", #tmp, 13)
+    read REGISTER_2_5KLUX_BLUE_WORD, word tmp
+    sertxd("2.5KluxBlue:", #tmp, 13)
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
+    sertxd("2.5KluxWhite:", #tmp, 13)
+    read REGISTER_5KLUX_RED_WORD, word tmp
+    sertxd("5KluxRed:", #tmp, 13)
+    read REGISTER_5KLUX_GREEN_WORD, word tmp
+    sertxd("5KluxGreen:", #tmp, 13)
+    read REGISTER_5KLUX_BLUE_WORD, word tmp
+    sertxd("5KluxBlue:", #tmp, 13)
+    read REGISTER_5KLUX_WHITE_WORD, word tmp
+    sertxd("5KluxWhite:", #tmp, 13)
+    read REGISTER_10KLUX_RED_WORD, word tmp
+    sertxd("10KluxRed:", #tmp, 13)
+    read REGISTER_10KLUX_GREEN_WORD, word tmp
+    sertxd("10KluxGreen:", #tmp, 13)
+    read REGISTER_10KLUX_BLUE_WORD, word tmp
+    sertxd("10KluxBlue:", #tmp, 13)
+    read REGISTER_10KLUX_WHITE_WORD, word tmp
+    sertxd("10KluxWhite:", #tmp, 13)
+    read REGISTER_20KLUX_RED_WORD, word tmp
+    sertxd("20KluxRed:", #tmp, 13)
+    read REGISTER_20KLUX_GREEN_WORD, word tmp
+    sertxd("20KluxGreen:", #tmp, 13)
+    read REGISTER_20KLUX_BLUE_WORD, word tmp
+    sertxd("20Klux Blue:", #tmp, 13)
+    read REGISTER_20KLUX_WHITE_WORD, word tmp
+    sertxd("20KluxWhite:", #tmp, 13)
+    read REGISTER_LIGHT_GOAL_WORD, word tmp
+    sertxd("LightGoal:", #tmp, 13)
+    read REGISTER_LIGHT_COUNTER_WORD, word tmp
+    sertxd("LightCounter:", #tmp, 13)
     calibadc10 tmp
     tmp = 52378 / tmp * 2
     sertxd("Batttey: ", #tmp, "0mV", 13)
@@ -463,6 +610,26 @@ erase_all_data:
     next tmp
     gosub reset_pointer
     gosub reset_reboot_counter
+    return
+
+zero_calibration:
+    tmp = 0
+    write REGISTER_2_5KLUX_RED_WORD, word tmp
+    write REGISTER_2_5KLUX_GREEN_WORD, word tmp
+    write REGISTER_2_5KLUX_BLUE_WORD, word tmp
+    write REGISTER_2_5KLUX_WHITE_WORD, word tmp
+    write REGISTER_5KLUX_RED_WORD, word tmp
+    write REGISTER_5KLUX_GREEN_WORD, word tmp
+    write REGISTER_5KLUX_BLUE_WORD, word tmp
+    write REGISTER_5KLUX_WHITE_WORD, word tmp
+    write REGISTER_10KLUX_RED_WORD, word tmp
+    write REGISTER_10KLUX_GREEN_WORD, word tmp
+    write REGISTER_10KLUX_BLUE_WORD, word tmp
+    write REGISTER_10KLUX_WHITE_WORD, word tmp
+    write REGISTER_20KLUX_RED_WORD, word tmp
+    write REGISTER_20KLUX_GREEN_WORD, word tmp
+    write REGISTER_20KLUX_BLUE_WORD, word tmp
+    write REGISTER_20KLUX_WHITE_WORD, word tmp
     return
 
 high_speed:
