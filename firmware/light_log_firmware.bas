@@ -400,6 +400,9 @@ check_serial_comms:
     elseif ser_in_byte = "m" then
         gosub zero_day_phase
 
+    elseif ser_in_byte = "n" then
+        gosub half_day_phase
+
     elseif ser_in_byte = "z" then
         gosub first_boot_init
 
@@ -617,6 +620,11 @@ zero_light_goal:
 
 zero_day_phase:
     tmp = 0
+    write REGISTER_DAY_PHASE_WORD, word tmp
+    return
+
+half_day_phase:
+    tmp = 720
     write REGISTER_DAY_PHASE_WORD, word tmp
     return
 
