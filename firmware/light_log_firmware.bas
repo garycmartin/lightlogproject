@@ -61,7 +61,7 @@ TODO:
  - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
 #endrem
 
-#no_data ; <---- test this (re-programming should not zap eprom data)
+#no_data ; Make sure re-programming does not zap eprom memory
 #picaxe 14m2
 
 ;#define DEBUG_SENSORS ; Debug output for sensor data
