@@ -76,7 +76,7 @@ init:
     disabletime
     disconnect
 
-    symbol FIRMWARE_VERSION = 17
+    symbol FIRMWARE_VERSION = 18
     symbol HARDWARE_VERSION = 3
 
     symbol LED = C.1
