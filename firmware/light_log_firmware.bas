@@ -413,9 +413,6 @@ check_serial_comms:
 
         case "z"
         gosub first_boot_init
-
-        else
-            sertxd("Unknown_comms:", ser_in_byte, 13)
     endselect
 
     serial_checked:
