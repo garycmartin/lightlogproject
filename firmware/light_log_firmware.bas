@@ -535,6 +535,7 @@ header_block:
     sertxd("Phase:", #tmp, ";")
     calibadc10 tmp
     tmp = 52378 / tmp * 2
+    sertxd("Batt:", #tmp, "0mV", ";")
     sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
     sertxd("head_eof")
     return
