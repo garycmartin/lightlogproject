@@ -659,37 +659,37 @@ half_day_phase:
 default_light_calibration:
     ; Default calibration using full spectrum white light measured with
     ; device inside case, behind RGB & clear light gels, and at room temp.
-    tmp = 529
+    tmp = 579
     write REGISTER_2_5KLUX_RED_WORD, word tmp
-    tmp = 375
+    tmp = 468
     write REGISTER_2_5KLUX_GREEN_WORD, word tmp
-    tmp = 274
+    tmp = 435
     write REGISTER_2_5KLUX_BLUE_WORD, word tmp
-    tmp = 748
+    tmp = 794
     write REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    tmp = 611
+    tmp = 662
     write REGISTER_5KLUX_RED_WORD, word tmp
-    tmp = 481
+    tmp = 566
     write REGISTER_5KLUX_GREEN_WORD, word tmp
-    tmp = 349
+    tmp = 529
     write REGISTER_5KLUX_BLUE_WORD, word tmp
-    tmp = 811
+    tmp = 838
     write REGISTER_5KLUX_WHITE_WORD, word tmp
-    tmp = 717
+    tmp = 719
     write REGISTER_10KLUX_RED_WORD, word tmp
-    tmp = 617
+    tmp = 633
     write REGISTER_10KLUX_GREEN_WORD, word tmp
-    tmp = 481
+    tmp = 608
     write REGISTER_10KLUX_BLUE_WORD, word tmp
-    tmp = 854
+    tmp = 862
     write REGISTER_10KLUX_WHITE_WORD, word tmp
-    tmp = 783
+    tmp = 789
     write REGISTER_20KLUX_RED_WORD, word tmp
-    tmp = 700
+    tmp = 733
     write REGISTER_20KLUX_GREEN_WORD, word tmp
-    tmp = 581
+    tmp = 698
     write REGISTER_20KLUX_BLUE_WORD, word tmp
-    tmp = 872
+    tmp = 887
     write REGISTER_20KLUX_WHITE_WORD, word tmp
     return
 
