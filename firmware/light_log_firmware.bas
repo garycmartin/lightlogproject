@@ -484,20 +484,20 @@ pulse_led_delay:
 
 header_block:
     read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-    sertxd("Unique_ID:", #tmp)
+    sertxd("ID:", #tmp)
     read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
     sertxd(",", #tmp, ";")
 	read REGISTER_HARDWARE_VERSION_BYTE, tmp
-    sertxd("Hardware:", #tmp, ";")
-    sertxd("Firmware:", #FIRMWARE_VERSION, ";")
+    sertxd("HW:", #tmp, ";")
+    sertxd("FW:", #FIRMWARE_VERSION, ";")
     read REGISTER_REBOOT_COUNT_WORD, word tmp
-    sertxd("RebootCount:", #tmp, ";")
+    sertxd("Boots:", #tmp, ";")
     read REGISTER_LAST_SAVE_WORD, word index
-    sertxd("MemoryPointer:", #index, ";")
+    sertxd("Pointer:", #index, ";")
     read REGISTER_MEMORY_WRAPPED_WORD, word index
-    sertxd("MemoryWrapped:", #index, ";")
+    sertxd("Wrap:", #index, ";")
 	read REGISTER_LOG_START_TIME_WORD1, word tmp
-    sertxd("TimeStart:", #tmp)
+    sertxd("Start:", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
     sertxd(",", #tmp, ";")
     read REGISTER_2_5KLUX_RED_WORD, word tmp
@@ -538,7 +538,6 @@ header_block:
     sertxd("Phase:", #tmp, ";")
     calibadc10 tmp
     tmp = 52378 / tmp * 2
-    sertxd("Batttey:", #tmp, "0mV", ";")
     sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
     sertxd("head_eof")
     return
