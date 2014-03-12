@@ -181,13 +181,7 @@ init:
 
 main:
     for sample_loop = 1 to SAMPLES_PER_AVERAGE
-        high SENSOR_POWER ; Sensors on
-        readadc10 SENSOR_RED, red
-        readadc10 SENSOR_GREEN, green
-        readadc10 SENSOR_BLUE, blue
-        readadc10 SENSOR_WHITE, white
-        low SENSOR_POWER ; Sensors off
-
+        gosub read_RGBW_sensors
         if sample_loop = 1 then
             ; Pre-fill averages for first pass
             red_avg = red
@@ -311,8 +305,16 @@ main:
 
 low_power_delay:
     ; Save power and sleep
-    ;nap 8 ; ~4sec
     nap 6 : nap 5 : nap 4 : nap 0 : nap 0 ; ~2sec
+    return
+
+read_RGBW_sensors:
+    high SENSOR_POWER
+    readadc10 SENSOR_RED, red
+    readadc10 SENSOR_GREEN, green
+    readadc10 SENSOR_BLUE, blue
+    readadc10 SENSOR_WHITE, white
+    low SENSOR_POWER
     return
 
 check_user_button:
@@ -369,52 +371,52 @@ check_serial_comms:
     sertxd("Hello?")
     serrxd [150, serial_checked], ser_in_byte
 
-    if ser_in_byte = "a" then
-        gosub display_status
+    select case ser_in_byte
+        case "a"
+        gosub header_block
 
-    elseif ser_in_byte = "c" then
+        case "c"
         gosub dump_data
 
-    elseif ser_in_byte = "d" then
+        case "d"
         gosub dump_all_eprom_data
 
-    elseif ser_in_byte = "e" then
+        case "e"
         gosub reset_pointer
 
-    elseif ser_in_byte = "f" then
+        case "f"
         gosub reset_reboot_counter
 
-    elseif ser_in_byte = "g" then
+        case "g"
         gosub erase_all_data
 
-    elseif ser_in_byte = "h" then
+        case "h"
         gosub calibrate_2_5Klux
 
-    elseif ser_in_byte = "i" then
+        case "i"
         gosub calibrate_5Klux
 
-    elseif ser_in_byte = "j" then
+        case "j"
         gosub calibrate_10Klux
 
-    elseif ser_in_byte = "k" then
+        case "k"
         gosub calibrate_20Klux
 
-    elseif ser_in_byte = "l" then
+        case "l"
         gosub zero_light_goal
 
-    elseif ser_in_byte = "m" then
+        case "m"
         gosub zero_day_phase
 
-    elseif ser_in_byte = "n" then
+        case "n"
         gosub half_day_phase
 
-    elseif ser_in_byte = "z" then
+        case "z"
         gosub first_boot_init
 
-    else
-        sertxd("Unknown command: ", ser_in_byte, 13)
-
-    endif
+        else
+            sertxd("Unknown_comms:", ser_in_byte, 13)
+    endselect
 
     serial_checked:
     gosub low_speed
@@ -462,23 +464,25 @@ pulse_led:
         high LED
         pauseus tmp
         low LED
-        tmp = 15000 - tmp
-        pauseus tmp
-        tmp = 15000 - tmp
+        gosub pulse_led_delay
     next tmp
     ; Fade down
 	for tmp = 0 to 13000 step 1300
         high LED
-        tmp = 15000 - tmp
-        pauseus tmp
-        tmp = 15000 - tmp
+        gosub pulse_led_delay
         low LED
         pauseus tmp
     next tmp
     gosub low_speed
     return
 
-display_status:
+pulse_led_delay:
+    tmp = 13000 - tmp
+    pauseus tmp
+    tmp = 13000 - tmp
+    return
+
+header_block:
     read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
     sertxd("Unique_ID:", #tmp)
     read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
@@ -541,7 +545,7 @@ display_status:
 
 dump_data:
     ; Output data oldest to newest
-    gosub display_status
+    gosub header_block
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp
     if tmp > 0 then
         ; Dump end block of memory first if memory has wrapped one or more times
@@ -553,7 +557,7 @@ dump_data:
 
 dump_all_eprom_data:
     ; Debug output all eprom data in memory order
-    gosub display_status
+    gosub header_block
     gosub dump_up_to_index:
     gosub dump_from_index_to_end
     sertxd("data_eof")
@@ -603,23 +607,17 @@ erase_all_data:
     return
 
 first_boot_init:
-    write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
-    tmp = 0
-    write REGISTER_REBOOT_COUNT_WORD, word tmp
-    write REGISTER_LAST_SAVE_WORD, word tmp
-    write REGISTER_LOG_START_TIME_WORD1, word tmp
-    write REGISTER_LOG_START_TIME_WORD2, word tmp
-    write REGISTER_MEMORY_WRAPPED_WORD, word tmp
+    gosub reset_pointer
+    gosub reset_reboot_counter
     gosub zero_light_goal
     gosub zero_day_phase
+    write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
+    tmp = 0
+    write REGISTER_LOG_START_TIME_WORD1, word tmp
+    write REGISTER_LOG_START_TIME_WORD2, word tmp
 
     ; Generate unique hardware id (seed from sensor and battery readings)
-    high SENSOR_POWER
-    readadc10 SENSOR_RED, red
-    readadc10 SENSOR_GREEN, green
-    readadc10 SENSOR_BLUE, blue
-    readadc10 SENSOR_WHITE, white
-    low SENSOR_POWER
+    gosub read_RGBW_sensors
     calibadc10 tmp
     tmp = red * green * blue * white * tmp
     random tmp
