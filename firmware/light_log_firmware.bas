@@ -387,9 +387,6 @@ check_serial_comms:
         case "f"
         gosub reset_reboot_counter
 
-        case "g"
-        gosub erase_all_data
-
         case "h"
         gosub calibrate_2_5Klux
 
@@ -591,16 +588,6 @@ reset_pointer:
 reset_reboot_counter:
     tmp = 0
     write REGISTER_REBOOT_COUNT_WORD, word tmp ; reset reboot counter back to 0
-    return
-
-erase_all_data:
-    ; Debug erase eprom data (help with debugging)
-    for tmp = 0 to 65518 step 16
-        hi2cout tmp, (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        nap 0 ; Needs a delay or else looses writes
-    next tmp
-    gosub reset_pointer
-    gosub reset_reboot_counter
     return
 
 first_boot_init:
