@@ -44,21 +44,6 @@ POSSIBILITY OF SUCH DAMAGE.
                         LED C.1 -|6   9|- B.4 hi2c sda
                   Clear ADC C.0 -|7   8|- B.5 Blue ADC
                                   –––––
-
-TODO:
- - When full, compress data 50% and double number of samples per average and continue
- - Extend two way serial protocol:
-   - log start time (and transmit it during sync)
-   - generate device id for first boot (and transmit it during sync)
-   - report hardware version in status (store in picaxe rom, defined during first run)
-   - add a validate/checksum to sync process
- - First boot calibrate/test timer best we can?
- - Calculate and store average samples varience (indication of activity)?
- - HW: LED to C.2 would allow pwmout command for dimming control
- - HW: Use external RTC?
- - HW: Move B.1 for use of hardware serial in?
- - HW: Pull down all unused inputs to 0V, e.g. with 100K or even 1M resistors.
- - HW: Current-limit any outputs to the degree possible. (e.g. LEDs)
 #endrem
 
 #no_data ; Make sure re-programming does not zap eprom memory
