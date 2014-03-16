@@ -351,6 +351,68 @@ check_user_button:
     endif
     return
 
+flash_led:
+    ; Simple on/off flash (used on reboot)
+    high LED
+    nap 0
+    low LED
+    nap 2 ; 72ms
+    return
+
+pulse_led:
+    readadc10 SENSOR_WHITE, white
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
+    if white >= tmp then
+        ; Light is bright enough to count towards goal
+        goto fast_pulse_led
+    endif
+    gosub high_speed
+    pause 30
+    ; Fade up
+	for tmp = 0 to 13000 step 1300
+        high LED
+        pauseus tmp
+        low LED
+        gosub pulse_led_delay
+    next tmp
+    ; Fade down
+	for tmp = 0 to 13000 step 1300
+        high LED
+        gosub pulse_led_delay
+        low LED
+        pauseus tmp
+    next tmp
+    pause 30
+    gosub low_speed
+    return
+
+fast_pulse_led:
+    gosub high_speed
+    pause 15
+    ; Fade up
+	for tmp = 0 to 13000 step 3250
+        high LED
+        pauseus tmp
+        low LED
+        gosub pulse_led_delay
+    next tmp
+    ; Fade down
+	for tmp = 0 to 13000 step 3250
+        high LED
+        gosub pulse_led_delay
+        low LED
+        pauseus tmp
+    next tmp
+    pause 15
+    gosub low_speed
+    return
+
+pulse_led_delay:
+    tmp = 13000 - tmp
+    pauseus tmp
+    tmp = 13000 - tmp
+    return
+
 check_serial_comms:
     gosub high_speed
     sertxd("Hello?")
@@ -427,38 +489,6 @@ calibrate_20Klux:
     write REGISTER_20KLUX_GREEN_WORD, word green
     write REGISTER_20KLUX_BLUE_WORD, word blue
     write REGISTER_20KLUX_WHITE_WORD, word white
-    return
-
-flash_led:
-    high LED
-    nap 0
-    low LED
-    nap 2 ; 72ms
-    return
-
-pulse_led:
-    gosub high_speed
-    ; Fade up
-	for tmp = 0 to 13000 step 1300
-        high LED
-        pauseus tmp
-        low LED
-        gosub pulse_led_delay
-    next tmp
-    ; Fade down
-	for tmp = 0 to 13000 step 1300
-        high LED
-        gosub pulse_led_delay
-        low LED
-        pauseus tmp
-    next tmp
-    gosub low_speed
-    return
-
-pulse_led_delay:
-    tmp = 13000 - tmp
-    pauseus tmp
-    tmp = 13000 - tmp
     return
 
 header_block:
