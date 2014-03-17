@@ -585,9 +585,10 @@ dump_up_to_index:
     if tmp != 0 then
 	    tmp = tmp - BYTES_PER_RECORD - 1
     endif
-    for tmp2 = 0 to tmp step 4
-        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte)
-        sertxd (red_byte, green_byte, blue_byte, white_byte)
+    for tmp2 = 0 to tmp step 6
+        ; ser_in_byte used instead of flag to preserve its value
+        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
+        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
     next tmp2
     return
 
@@ -596,9 +597,10 @@ dump_from_index_to_end:
     if tmp != 0 then
 	    tmp = tmp - BYTES_PER_RECORD
     endif
-    for tmp2 = tmp to LAST_VALID_BYTE step 4
-        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte)
-        sertxd (red_byte, green_byte, blue_byte, white_byte)
+    for tmp2 = tmp to LAST_VALID_BYTE step 6
+        ; ser_in_byte used instead of flag to preserve its value
+        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
+        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
     next tmp2
     return
 
