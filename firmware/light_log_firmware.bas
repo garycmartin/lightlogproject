@@ -132,8 +132,8 @@ init:
     symbol green_avg = w5
     symbol blue_avg = w6
     symbol white_avg = w7
-    symbol index = w8
-    symbol tmp = w9
+    symbol tmp = w8
+    symbol tmp2 = w9
 
     symbol red_byte = b20
     symbol green_byte = b21
@@ -203,32 +203,40 @@ main:
     white_avg = white_avg / SAMPLES_PER_AVERAGE
 
     ; Accumulate light for goal target
-    ; TODO: Replace with smooth function between 2.5K and 10K
-    read REGISTER_10KLUX_WHITE_WORD, word tmp
-    if white_avg >= tmp then
-        read REGISTER_LIGHT_GOAL_WORD, word tmp
-        tmp = tmp + 100
-        write REGISTER_LIGHT_GOAL_WORD, word tmp
-        goto end_goal_update
-    endif
-
-    read REGISTER_5KLUX_WHITE_WORD, word tmp
-    if white_avg >= tmp then
-        read REGISTER_LIGHT_GOAL_WORD, word tmp
-        tmp = tmp + 50
-        write REGISTER_LIGHT_GOAL_WORD, word tmp
-        goto end_goal_update
-    endif
-
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    if white_avg >= tmp then
-        read REGISTER_LIGHT_GOAL_WORD, word tmp
-        tmp = tmp + 25
-        write REGISTER_LIGHT_GOAL_WORD, word tmp
-        goto end_goal_update
-    endif        
+    read REGISTER_5KLUX_WHITE_WORD, word tmp2
+    if white_avg >= tmp and white_avg < tmp2 then
+        tmp2 = tmp2 - tmp ; 5K - 2.5K calibration delta
+        tmp2 = 500 / tmp2 ; scale factor for one sensor unit
+        tmp = white_avg - tmp * tmp2 + 500; goal points between 50 and 1000
+        goto goal_update
+    endif
 
-    end_goal_update:
+    read REGISTER_10KLUX_WHITE_WORD, word tmp
+    if white_avg >= tmp2 and white_avg < tmp then
+        tmp = tmp - tmp2 ; 10K - 5K calibration delta
+        tmp = 1000 / tmp ; scale factor for one sensor unit
+        tmp = white_avg - tmp2 * tmp + 1000; goal points between 1,00 and 2,000
+        goto goal_update
+    endif
+
+    if white_avg >= tmp then
+        tmp = 2000 ; maximum 2,000 points per min
+        goto goal_update
+    endif
+
+    goto skip_goal_update
+
+    goal_update:
+    read REGISTER_LIGHT_GOAL_WORD, word tmp2
+    if tmp2 < 60000 then
+        tmp2 = tmp2 + tmp
+    else
+        tmp2 = 60000
+    endif
+    write REGISTER_LIGHT_GOAL_WORD, word tmp2
+
+    skip_goal_update:
 
     ; Keep track of day phase cycle
     read REGISTER_DAY_PHASE_WORD, word tmp
@@ -253,18 +261,18 @@ main:
     extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
     ; Write data to eprom
-    read REGISTER_LAST_SAVE_WORD, word index
-    hi2cout index, (red_byte, green_byte)
-	index = index + 2
-    hi2cout index, (blue_byte, white_byte)
-	index = index + 2
-    hi2cout index, (extra_byte, flag)
-	index = index + 2
+    read REGISTER_LAST_SAVE_WORD, word tmp
+    hi2cout tmp, (red_byte, green_byte)
+	tmp = tmp + 2
+    hi2cout tmp, (blue_byte, white_byte)
+	tmp = tmp + 2
+    hi2cout tmp, (extra_byte, flag)
+	tmp = tmp + 2
 
     ; Debug sensor output
     #ifdef DEBUG_WRITE
         gosub high_speed
-        sertxd("Write to ", #index, _
+        sertxd("Write to ", #tmp, _
                ", R=", #red_byte, _
                ", G=", #green_byte, _
                ", B=", #blue_byte, _
@@ -277,14 +285,18 @@ main:
     flag = FLAG_OK ; Clear any flag states
 
     ; Increment and write current position to micro eprom (mem bytes = 65536)
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
-	if index >= LAST_VALID_RECORD then
-        index = 0
+	if tmp >= LAST_VALID_RECORD then
+        tmp = 0
+        write REGISTER_LAST_SAVE_WORD, word tmp
+
         ; Keep track of memory wrapps
+        read REGISTER_MEMORY_WRAPPED_WORD, word tmp
         tmp = tmp + 1
         write REGISTER_MEMORY_WRAPPED_WORD, word tmp
+
+    else
+        write REGISTER_LAST_SAVE_WORD, word tmp
     endif
-    write REGISTER_LAST_SAVE_WORD, word index
 
     goto main
 
@@ -321,21 +333,22 @@ check_user_button:
         reconnect
 
         ; User feedback based on light goal
+        gosub read_RGBW_sensors
         read REGISTER_LIGHT_GOAL_WORD, word tmp
-        if tmp > 3000 then
+        if tmp >= 60000 then
             ; Minimim recommended light goal reached
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
 
-        elseif tmp > 2000 then
+        elseif tmp >= 40000 then
             ; Two thirds of light goal reached
             gosub pulse_led
             gosub pulse_led
             gosub pulse_led
 
-        elseif tmp > 1000 then
+        elseif tmp >= 20000 then
             ; Third of light goal reached
             gosub pulse_led
             gosub pulse_led
@@ -360,50 +373,45 @@ flash_led:
     return
 
 pulse_led:
-    readadc10 SENSOR_WHITE, white
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp
     if white >= tmp then
         ; Light is bright enough to count towards goal
         goto fast_pulse_led
     endif
     gosub high_speed
-    pause 30
     ; Fade up
-	for tmp = 0 to 13000 step 1300
+	for tmp = 0 to 13000 step 1625
         high LED
         pauseus tmp
         low LED
         gosub pulse_led_delay
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 1300
+	for tmp = 0 to 13000 step 1625
         high LED
         gosub pulse_led_delay
         low LED
         pauseus tmp
     next tmp
-    pause 30
     gosub low_speed
     return
 
 fast_pulse_led:
     gosub high_speed
-    pause 15
     ; Fade up
-	for tmp = 0 to 13000 step 3250
+	for tmp = 0 to 13000 step 6500
         high LED
         pauseus tmp
         low LED
         gosub pulse_led_delay
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 3250
+	for tmp = 0 to 13000 step 6500
         high LED
         gosub pulse_led_delay
         low LED
         pauseus tmp
     next tmp
-    pause 15
     gosub low_speed
     return
 
@@ -501,10 +509,10 @@ header_block:
     sertxd("FW:", #FIRMWARE_VERSION, ";")
     read REGISTER_REBOOT_COUNT_WORD, word tmp
     sertxd("Boots:", #tmp, ";")
-    read REGISTER_LAST_SAVE_WORD, word index
-    sertxd("Pointer:", #index, ";")
-    read REGISTER_MEMORY_WRAPPED_WORD, word index
-    sertxd("Wrap:", #index, ";")
+    read REGISTER_LAST_SAVE_WORD, word tmp
+    sertxd("Pointer:", #tmp, ";")
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
+    sertxd("Wrap:", #tmp, ";")
 	read REGISTER_LOG_START_TIME_WORD1, word tmp
     sertxd("Start:", #tmp)
 	read REGISTER_LOG_START_TIME_WORD2, word tmp
@@ -573,31 +581,31 @@ dump_all_eprom_data:
     return
 
 dump_up_to_index:
-    read REGISTER_LAST_SAVE_WORD, word index
-    if index != 0 then
-	    index = index - BYTES_PER_RECORD - 1
+    read REGISTER_LAST_SAVE_WORD, word tmp
+    if tmp != 0 then
+	    tmp = tmp - BYTES_PER_RECORD - 1
     endif
-    for tmp = 0 to index
-        hi2cin tmp, (red_byte)
-        sertxd (red_byte)
-    next tmp
+    for tmp2 = 0 to tmp step 4
+        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte)
+        sertxd (red_byte, green_byte, blue_byte, white_byte)
+    next tmp2
     return
 
 dump_from_index_to_end:
-    read REGISTER_LAST_SAVE_WORD, word index
-    if index != 0 then
-	    index = index - BYTES_PER_RECORD
+    read REGISTER_LAST_SAVE_WORD, word tmp
+    if tmp != 0 then
+	    tmp = tmp - BYTES_PER_RECORD
     endif
-    for tmp = index to LAST_VALID_BYTE
-        hi2cin tmp, (red_byte)
-        sertxd (red_byte)
-    next tmp
+    for tmp2 = tmp to LAST_VALID_BYTE step 4
+        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte)
+        sertxd (red_byte, green_byte, blue_byte, white_byte)
+    next tmp2
     return
 
 reset_pointer:
-    index = 0 ; reset pointers back to start of mem
-    write REGISTER_LAST_SAVE_WORD, word index
-    write REGISTER_MEMORY_WRAPPED_WORD, word index
+    tmp = 0 ; reset pointers back to start of mem
+    write REGISTER_LAST_SAVE_WORD, word tmp
+    write REGISTER_MEMORY_WRAPPED_WORD, word tmp
     return
 
 reset_reboot_counter:
