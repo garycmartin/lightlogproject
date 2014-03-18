@@ -55,10 +55,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 init:
     ; Save all the power we can
-    gosub low_speed
     disablebod
     disabletime
     disconnect
+    gosub low_speed
 
     symbol FIRMWARE_VERSION = 18
     symbol HARDWARE_VERSION = 3
