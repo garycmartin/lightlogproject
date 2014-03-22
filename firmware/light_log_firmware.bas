@@ -378,43 +378,44 @@ pulse_led:
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp
     if white >= tmp then
         ; Light is bright enough to count towards goal
-        goto fast_pulse_led
+        gosub fast_pulse_led
+    else
+        gosub slow_pulse_led
     endif
-    gosub high_speed
+    return
+
+slow_pulse_led:
     ; Fade up
-	for tmp = 0 to 13000 step 1625
+	for tmp = 0 to 13000 step 1300
         high LED
         pauseus tmp
         low LED
         gosub pulse_led_delay
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 1625
+	for tmp = 0 to 13000 step 1300
         high LED
         gosub pulse_led_delay
         low LED
         pauseus tmp
     next tmp
-    gosub low_speed
     return
 
 fast_pulse_led:
-    gosub high_speed
     ; Fade up
-	for tmp = 0 to 13000 step 6500
+	for tmp = 0 to 13000 step 3250
         high LED
         pauseus tmp
         low LED
         gosub pulse_led_delay
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 6500
+	for tmp = 0 to 13000 step 3250
         high LED
         gosub pulse_led_delay
         low LED
         pauseus tmp
     next tmp
-    gosub low_speed
     return
 
 pulse_led_delay:
@@ -424,7 +425,6 @@ pulse_led_delay:
     return
 
 check_serial_comms:
-    gosub high_speed
     sertxd("Hello?")
     serrxd [150, serial_checked], ser_in_byte
 
@@ -470,7 +470,6 @@ check_serial_comms:
     endselect
 
     serial_checked:
-    gosub low_speed
     return
 
 calibrate_2_5Klux:
