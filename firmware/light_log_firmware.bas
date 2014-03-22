@@ -207,7 +207,7 @@ main:
     if white_avg >= tmp and white_avg < tmp2 then
         tmp2 = tmp2 - tmp ; 5K - 2.5K calibration delta
         tmp2 = 500 / tmp2 ; scale factor for one sensor unit
-        tmp = white_avg - tmp * tmp2 + 500; goal points between 50 and 1000
+        tmp = white_avg - tmp * tmp2 + 500; goal points between 500 and 1,000
         goto goal_update
     endif
 
@@ -215,7 +215,7 @@ main:
     if white_avg >= tmp2 and white_avg < tmp then
         tmp = tmp - tmp2 ; 10K - 5K calibration delta
         tmp = 1000 / tmp ; scale factor for one sensor unit
-        tmp = white_avg - tmp2 * tmp + 1000; goal points between 1,00 and 2,000
+        tmp = white_avg - tmp2 * tmp + 1000; goal points between 1,000 and 2,000
         goto goal_update
     endif
 
