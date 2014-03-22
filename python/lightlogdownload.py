@@ -331,13 +331,13 @@ def main():
                     elif args.zero_reboot_count:
                         ser.write('f') # f = reset reboot counter
                     elif args.calibrate == 'lux2500':
-                        ser.write('h') # h = calibrate to 2.5K lux!!
+                        ser.write('h') # h = calibrate to 2.5K lux source!!
                     elif args.calibrate == 'lux5000':
-                        ser.write('i') # i = calibrate to 5K lux!!
+                        ser.write('i') # i = calibrate to 5K lux source!!
                     elif args.calibrate == 'lux10000':
-                        ser.write('j') # j = calibrate to 10K lux!!
+                        ser.write('j') # j = calibrate to 10K lux source!!
                     elif args.calibrate == 'lux20000':
-                        ser.write('k') # k = calibrate to 20K lux!!
+                        ser.write('k') # k = calibrate to 20K lux source!!
                     elif args.zero_goal:
                         ser.write('l') # l = zero light goal
                     elif args.zero_day_phase:
@@ -345,7 +345,7 @@ def main():
                     elif args.half_day_phase:
                         ser.write('n') # n = half day phase (peak sleep point + half day)
                     elif args.first_boot_init:
-                        ser.write('z') # z = first boot init (but not calibration zero)!!!
+                        ser.write('z') # z = first boot init (but not leave calibration alone)!
                     else:
                         ser.write('c') # c = download
                     communication_phase = 1
