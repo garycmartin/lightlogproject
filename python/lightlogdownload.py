@@ -420,10 +420,7 @@ def main():
         data = data[:-8]
         status_dict = parse_status_header(data)
         print >> sys.stderr, "Status:", status_dict
-        
-    else:
-        print >> sys.stderr, "No data block downloaded"
-    
+            
     if use_log_file:
         f.close()
     
