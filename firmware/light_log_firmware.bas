@@ -325,6 +325,7 @@ check_user_button:
     #endif
 
     if EVENT_BUTTON = 0 then
+        gosub high_speed
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
 
@@ -333,6 +334,10 @@ check_user_button:
 
         ; User feedback based on light goal
         gosub read_RGBW_sensors
+
+        ; Prevent program upload (saves power)
+        disconnect
+
         read REGISTER_LIGHT_GOAL_WORD, word tmp
         if tmp >= 60000 then
             ; Minimim recommended light goal reached
@@ -356,11 +361,9 @@ check_user_button:
             ; Less than a third of light goal
             gosub pulse_led
         endif
-
-        ; Prevent program upload (saves power)
-        disconnect
-
+        gosub low_speed
     endif
+
     return
 
 flash_led:
