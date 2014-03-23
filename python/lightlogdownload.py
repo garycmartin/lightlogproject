@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Downloads and convert data from a Light Log <http://lightlogproject.org>.
+"""Download and convert data from a Light Log <http://lightlogproject.org>.
 
 Raw data bytes are downloaded from a Light Log device through a serial port and
 saved as a CSV file for easy processing with external tools. Time stamps use
@@ -50,7 +50,7 @@ CALIBRATION_DATA =  {'0': 0, '1': 28, '10': 60, '50': 213, '100': 296, '200': 40
 
 def get_args():
     """
-    Parses and returns command line arguments.
+    Parse and return command line arguments.
     """
     parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>.')
     parser.add_argument("-p", "--port",
@@ -107,7 +107,7 @@ def get_args():
 
 def get_serial_ports():
     """
-    Returns a generator for all available serial ports.
+    Return generator for available serial ports.
     """
     if platform.system() == 'Windows':
         # Windows
@@ -125,7 +125,7 @@ def get_serial_ports():
 
 def parse_status_header(status):
     """
-    Extracts data from status header, returning it as a dictionary.
+    Extract data from Light Log status header, returning a dictionary.
     """
     status_list = [i.split(':') for i in status.split(';')]
     status_dict = dict(zip([i[0] for i in status_list], [i[1] for i in status_list]))
@@ -245,14 +245,14 @@ def linear_interpolation(x):
         x = (x - CALIBRATION_DATA['85000']) / (CALIBRATION_DATA['116000'] - CALIBRATION_DATA['85000']) * 31000 + 85000
 
     else:
-        # Estimated (that sensor maxes out 1023 = 200Klux, no test data)
+        # Estimated (that sensor maxes out 1023 = 200Klux, no test data to confirm)
         x = (x - CALIBRATION_DATA['116000']) / (1023 - CALIBRATION_DATA['116000']) * 84000 + 116000
         
     return x
 
 def inverse_harris(x):
     """
-    http://zunzun.com/Equation/2/YieldDensity/InverseHarris/
+    Curve fitted lux function http://zunzun.com/Equation/2/YieldDensity/InverseHarris/
     """
     x = float(x)
     a = -1.0418515764334417E+00
@@ -262,7 +262,7 @@ def inverse_harris(x):
 
 def ramberg_osgood_fit(x):
     """
-    http://zunzun.com/Equation/2/Engineering/Ramberg-Osgood/
+    Curve fitted lux function http://zunzun.com/Equation/2/Engineering/Ramberg-Osgood/
     """
     x = float(x)
     youngs_modulus = 1.9765780295845900E-01
@@ -272,7 +272,7 @@ def ramberg_osgood_fit(x):
 
 def exponential_fit(x):
     """
-    http://zunzun.com/Equation/2/Exponential/Exponential/
+    Curve fitted lux function http://zunzun.com/Equation/2/Exponential/Exponential/
     """
     x = float(x)
     a = 2.1242230658871749E-15
