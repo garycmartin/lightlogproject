@@ -284,12 +284,6 @@ def main():
     args = get_args()
     data = ''
 
-    if args.output:
-        use_log_file = True
-        output_log_file = args.output
-    else:
-        use_log_file = False
-
     if args.port:
         serial_ports = [args.port]
     else:
@@ -306,9 +300,9 @@ def main():
             
         else:
             print >> sys.stderr, "Listening to %s for data (press Light Log button)" % (port)
-            if use_log_file:
+            if args.output:
                 # Open file for appending new serial data
-                f = open(output_log_file, "a")
+                f = open(args.output, "a")
             break
     
     # Download available data
@@ -406,7 +400,7 @@ def main():
                                                                 rgb[2], rgb[3],
                                                                 status_dict)
                                         
-            if use_log_file:
+            if args.output:
                 f.write("%s,%s,%s,%s,%s,%s\n" % (rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags))
             else:
                 print "%s,%s,%s,%s,%s,%s" % (rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags)
@@ -422,7 +416,7 @@ def main():
         status_dict = parse_status_header(data)
         print >> sys.stderr, "Status:", status_dict
             
-    if use_log_file:
+    if args.output:
         f.close()
     
 if __name__ == '__main__':
