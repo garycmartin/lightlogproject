@@ -185,71 +185,18 @@ def linear_interpolation(x):
     """\
     Linear interpolation between recorded data point values.
     """
-    CALIBRATION_DATA =  {'0': 0, '1': 28, '10': 60, '50': 213, '100': 296, '200': 406, '300': 461, '500': 531, '1000': 633, '2500': 794, '5000': 838, '10000': 862, '20000': 887, '54000': 902, '58000': 903, '60000': 904, '66000': 905, '80000': 908, '85000': 909, '116000': 917}
-
+    calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
+    calibration_data.reverse()
     x = float(x)
-    if x < CALIBRATION_DATA['1']:
-        x = x / CALIBRATION_DATA['1']
-        
-    elif x >= CALIBRATION_DATA['1'] and x < CALIBRATION_DATA['10']:
-        x = (x - CALIBRATION_DATA['1']) / (CALIBRATION_DATA['10'] - CALIBRATION_DATA['1']) * 9 + 1
+    result = None
+    old_pair = None
+    for pair in calibration_data:
+        if x >= pair[1] and old_pair:
+            result = (x - pair[1]) / (old_pair[1] - pair[1]) * (old_pair[0] - pair[0]) + pair[0]
+            break
+        old_pair = pair
 
-    elif x >= CALIBRATION_DATA['10'] and x < CALIBRATION_DATA['50']:
-        x = (x - CALIBRATION_DATA['10']) / (CALIBRATION_DATA['50'] - CALIBRATION_DATA['10']) * 40 + 10
-
-    elif x >= CALIBRATION_DATA['50'] and x < CALIBRATION_DATA['100']:
-        x = (x - CALIBRATION_DATA['50']) / (CALIBRATION_DATA['100'] - CALIBRATION_DATA['50']) * 50 + 50
-
-    elif x >= CALIBRATION_DATA['100'] and x < CALIBRATION_DATA['200']:
-        x = (x - CALIBRATION_DATA['100']) / (CALIBRATION_DATA['200'] - CALIBRATION_DATA['100']) * 100 + 100
-
-    elif x >= CALIBRATION_DATA['200'] and x < CALIBRATION_DATA['300']:
-        x = (x - CALIBRATION_DATA['200']) / (CALIBRATION_DATA['300'] - CALIBRATION_DATA['200']) * 100 + 200
-
-    elif x >= CALIBRATION_DATA['300'] and x < CALIBRATION_DATA['500']:
-        x = (x - CALIBRATION_DATA['300']) / (CALIBRATION_DATA['500'] - CALIBRATION_DATA['300']) * 200 + 300
-
-    elif x >= CALIBRATION_DATA['500'] and x < CALIBRATION_DATA['1000']:
-        x = (x - CALIBRATION_DATA['500']) / (CALIBRATION_DATA['1000'] - CALIBRATION_DATA['500']) * 500 + 500
-
-    elif x >= CALIBRATION_DATA['1000'] and x < CALIBRATION_DATA['2500']:
-        x = (x - CALIBRATION_DATA['1000']) / (CALIBRATION_DATA['2500'] - CALIBRATION_DATA['1000']) * 1500 + 1000
-
-    elif x >= CALIBRATION_DATA['2500'] and x < CALIBRATION_DATA['5000']:
-        x = (x - CALIBRATION_DATA['2500']) / (CALIBRATION_DATA['5000'] - CALIBRATION_DATA['2500']) * 2500 + 2500
-
-    elif x >= CALIBRATION_DATA['5000'] and x < CALIBRATION_DATA['10000']:
-        x = (x - CALIBRATION_DATA['5000']) / (CALIBRATION_DATA['10000'] - CALIBRATION_DATA['5000']) * 5000 + 5000
-
-    elif x >= CALIBRATION_DATA['10000'] and x < CALIBRATION_DATA['20000']:
-        x = (x - CALIBRATION_DATA['10000']) / (CALIBRATION_DATA['20000'] - CALIBRATION_DATA['10000']) * 10000 + 10000
-
-    elif x >= CALIBRATION_DATA['20000'] and x < CALIBRATION_DATA['54000']:
-        x = (x - CALIBRATION_DATA['20000']) / (CALIBRATION_DATA['54000'] - CALIBRATION_DATA['20000']) * 34000 + 20000
-
-    elif x >= CALIBRATION_DATA['54000'] and x < CALIBRATION_DATA['58000']:
-        x = (x - CALIBRATION_DATA['54000']) / (CALIBRATION_DATA['58000'] - CALIBRATION_DATA['54000']) * 40000 + 54000
-
-    elif x >= CALIBRATION_DATA['58000'] and x < CALIBRATION_DATA['60000']:
-        x = (x - CALIBRATION_DATA['58000']) / (CALIBRATION_DATA['60000'] - CALIBRATION_DATA['58000']) * 2000 + 58000
-
-    elif x >= CALIBRATION_DATA['60000'] and x < CALIBRATION_DATA['66000']:
-        x = (x - CALIBRATION_DATA['60000']) / (CALIBRATION_DATA['66000'] - CALIBRATION_DATA['60000']) * 6000 + 60000
-
-    elif x >= CALIBRATION_DATA['66000'] and x < CALIBRATION_DATA['80000']:
-        x = (x - CALIBRATION_DATA['66000']) / (CALIBRATION_DATA['80000'] - CALIBRATION_DATA['66000']) * 14000 + 66000
-
-    elif x >= CALIBRATION_DATA['80000'] and x < CALIBRATION_DATA['85000']:
-        x = (x - CALIBRATION_DATA['80000']) / (CALIBRATION_DATA['85000'] - CALIBRATION_DATA['80000']) * 5000 + 80000
-
-    elif x >= CALIBRATION_DATA['85000'] and x < CALIBRATION_DATA['116000']:
-        x = (x - CALIBRATION_DATA['85000']) / (CALIBRATION_DATA['116000'] - CALIBRATION_DATA['85000']) * 31000 + 85000
-
-    else:
-        # Estimated (that sensor maxes out 1023 = 200Klux, no test data to confirm)
-        x = (x - CALIBRATION_DATA['116000']) / (1023 - CALIBRATION_DATA['116000']) * 84000 + 116000
-        
-    return x
+    return result
 
 def inverse_harris(x):
     """\
