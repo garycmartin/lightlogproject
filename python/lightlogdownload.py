@@ -1,5 +1,7 @@
 #!/usr/local/bin/python
 # coding=UTF-8
+# Tested with Python 2.7
+# Requires installation of the pyserial python module
 
 # Copyright (c) 2013, 2014, Gary C. Martin <gary@lightlogproject.org>
 # All rights reserved.
