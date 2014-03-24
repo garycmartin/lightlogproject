@@ -388,6 +388,7 @@ def main():
 
     elif expect_data:
         print >> sys.stderr, "Failed to communicate with Light Log."
+        sys.exit(1)
     
 if __name__ == '__main__':
     main()
