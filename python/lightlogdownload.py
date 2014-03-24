@@ -280,36 +280,16 @@ def exponential_fit(x):
     b = 4.8842737652298622E-02
     return a * math.exp(b * x)
 
-def main():
-    args = get_args()
-    data = ''
-
-    if args.port:
-        serial_ports = [args.port]
-    else:
-        serial_ports = list(get_serial_ports())[::-1]
-    
-    for port in serial_ports:
-        try:
-            # Open serial connection
-            ser = serial.Serial(port, 38400, timeout=0)
-            
-        except (OSError, IOError):
-            print >> sys.stderr, "No Light Log device found, tried %s." % (list(serial_ports))
-            sys.exit(1)
-            
-        else:
-            print >> sys.stderr, "Listening to %s for data (press Light Log button)" % (port)
-            if args.output:
-                # Open file for appending new serial data
-                f = open(args.output, "a")
-            break
-    
-    # Download available data
+def download_data_from_lightlog(ser, args):
+    """\
+    Download data from serial connection with Light Log.
+    """
     wait_time = 10
     timer = time.time()
     message_update = 512
     communication_phase = 0
+    data = ''
+    seconds_now = None
 
     while True:
         time.sleep(0.001) # free up some cpu
@@ -367,57 +347,103 @@ def main():
                 message_update += 512
                 print >> sys.stderr, 'Downloading data %d bytes%s' % (len(data), LINE_UP)
 
-    ser.close()
-
     if len(data) > 512:
         print >> sys.stderr
+        
+    return data, seconds_now
 
+def extract_data(data, args, seconds_now):
+    """\
+    Parse raw byte data block and return a list of row light data.
+    """    
+    data = data[:-8]
+    data_rows = []
+    seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
+    for i in range(0, len(data), 6):
+
+        rgb = [ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256),
+               ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64),
+               ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16),
+               ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)]
+                        
+        flags = ord(data[i + 5]) >> 6
+        # 11 = reboot
+        # 01 = blocked sensors
+        # 10 = button press
+        # 00 = OK
+        
+        if args.lux:
+            rgb[0], rgb[1], rgb[2], rgb[3] = convert_to_lux(rgb[0], rgb[1],
+                                                            rgb[2], rgb[3],
+                                                            status_dict)
+                                    
+        data_rows.append([rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags])
+        seconds += STEP_SECONDS
+
+    return data_rows
+
+def output_data_to_file(data_rows, file_name):
+    """\
+    Output data rows to file.
+    """
+    f = open(file_name, "a")    
+    for row in data_rows:
+        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+    f.close()
+
+def output_data_to_stdout(data_rows):
+    """\
+    Output data rows to std out.
+    """
+    for row in data_rows:
+        print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
+
+def main():
+    args = get_args()
+    
+    if args.port:
+        serial_ports = [args.port]
+    else:
+        serial_ports = list(get_serial_ports())[::-1]
+    
+    for port in serial_ports:
+        try:
+            # Open serial connection
+            ser = serial.Serial(port, 38400, timeout=0)
+            
+        except (OSError, IOError):
+            pass
+            
+        else:
+            print >> sys.stderr, ser.name
+            print >> sys.stderr, "Trying %s\n(press Light Log button)...%s" % (port, LINE_UP)
+            data, seconds_now = download_data_from_lightlog(ser, args)
+            ser.close()
+            if len(data) > 0:
+                break
+        
     if data[-8:] == 'data_eof':
         # Strip off status head from data
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
         print >> sys.stderr, "Status:", status_dict
         
-        print >> sys.stderr, 'Processing Light Log data'
-        data = data[:-8]
-        seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
-        count_samples = 0
-        for i in range(0, len(data), 6):
+        data_rows = extract_data(data, args, seconds_now)
+        print >> sys.stderr, "Downloaded", len(data_rows), "samples"
 
-            rgb = [ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256),
-                   ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64),
-                   ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16),
-                   ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)]
-                            
-            flags = ord(data[i + 5]) >> 6
-            # 11 = reboot
-            # 01 = blocked sensors
-            # 10 = button press
-            # 00 = OK
-            
-            if args.lux:
-                rgb[0], rgb[1], rgb[2], rgb[3] = convert_to_lux(rgb[0], rgb[1],
-                                                                rgb[2], rgb[3],
-                                                                status_dict)
-                                        
-            if args.output:
-                f.write("%s,%s,%s,%s,%s,%s\n" % (rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags))
-            else:
-                print "%s,%s,%s,%s,%s,%s" % (rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags)
-            seconds += STEP_SECONDS
-            count_samples += 1
-
-        data = ''
-        print >> sys.stderr, "Downloaded", count_samples, "samples"
+        if args.output:
+            output_data_to_file(data_rows, args.output)
+        else:
+            output_data_to_stdout(data_rows)
 
     elif data[-8:] == 'head_eof':
         # Status header block only
         data = data[:-8]
         status_dict = parse_status_header(data)
         print >> sys.stderr, "Status:", status_dict
-            
-    if args.output:
-        f.close()
+
+    else:
+        print >> sys.stderr, "Failed to communicate with Light Log device."
     
 if __name__ == '__main__':
     main()
