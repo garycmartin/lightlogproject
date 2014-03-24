@@ -340,6 +340,10 @@ def main():
     else:
         serial_ports = list(get_serial_ports())[::-1]
     
+    if len(serial_ports) == 0:
+        print >> sys.stderr, "No serial devices available."
+        sys.exit(1)
+    
     for port in serial_ports:
         try:
             # Open serial connection
