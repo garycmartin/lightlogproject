@@ -352,7 +352,7 @@ def download_data_from_lightlog(ser, args):
         
     return data, seconds_now
 
-def extract_data(data, args, seconds_now):
+def extract_data(data, args, seconds_now, status_dict):
     """\
     Parse raw byte data block and return a list of row light data.
     """    
@@ -428,7 +428,7 @@ def main():
         status_dict = parse_status_header(status)
         print >> sys.stderr, "Status:", status_dict
         
-        data_rows = extract_data(data, args, seconds_now)
+        data_rows = extract_data(data, args, seconds_now, status_dict)
         print >> sys.stderr, "Downloaded", len(data_rows), "samples"
 
         if args.output:
