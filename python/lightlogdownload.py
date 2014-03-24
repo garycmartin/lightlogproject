@@ -46,7 +46,6 @@ import serial
 from serial.tools import list_ports
 
 STEP_SECONDS = 60 # default
-LINE_UP = '\033[A'
 VERSION = 'v0.1'
 
 def get_args():
@@ -224,7 +223,7 @@ def download_data_from_lightlog(ser, args):
     """
     wait_time = 10
     timer = time.time()
-    message_update = 512
+    message_update = 2048
     communication_phase = 0
     data = ''
     seconds_now = None
@@ -253,6 +252,7 @@ def download_data_from_lightlog(ser, args):
                 if communication_phase == 0:
                     if args.status:
                         ser.write('a') # a = request status output
+                        expect_data = True
                     elif args.eeprom:
                         ser.write('d') # d = dump all eprom data
                         expect_data = True
@@ -280,17 +280,18 @@ def download_data_from_lightlog(ser, args):
                         ser.write('c') # c = download
                         expect_data = True
                     communication_phase = 1
-                    print >> sys.stderr, 'Communicating with Light Log device.'
+                    sys.stdout.write('Communicating with Light Log.')
+                    sys.stdout.flush()
                     # Grab current time now
                     seconds_now = int((datetime.datetime.now() - \
                                   datetime.datetime(1970,1,1,0,0)).total_seconds())
 
             if len(data) > message_update:
-                message_update += 512
-                print >> sys.stderr, 'Downloading data %d bytes%s' % (len(data), LINE_UP)
+                message_update += 2048
+                sys.stdout.write('.')
+                sys.stdout.flush()
 
-    if len(data) > 512:
-        print >> sys.stderr
+    print >> sys.stderr
         
     return data, seconds_now, expect_data
 
@@ -359,7 +360,7 @@ def main():
             pass
             
         else:
-            print >> sys.stderr, "Trying %s\n(press Light Log button)...%s" % (port, LINE_UP)
+            print >> sys.stderr, "Trying %s (press Light Log button)." % (port)
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
@@ -372,7 +373,7 @@ def main():
         print >> sys.stderr, "Status:", status_dict
         
         data_rows = extract_data(data, args, seconds_now, status_dict)
-        print >> sys.stderr, "Downloaded", len(data_rows), "samples"
+        print >> sys.stderr, "Downloaded", len(data_rows), "samples."
 
         if args.output:
             output_data_to_file(data_rows, args.output)
@@ -386,7 +387,7 @@ def main():
         print >> sys.stderr, "Status:", status_dict
 
     elif expect_data:
-        print >> sys.stderr, "Failed to communicate with Light Log device."
+        print >> sys.stderr, "Failed to communicate with Light Log."
     
 if __name__ == '__main__':
     main()
