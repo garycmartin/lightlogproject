@@ -48,7 +48,7 @@ LINE_UP = '\033[A'
 VERSION = 'v0.1'
 
 def get_args():
-    """
+    """\
     Parse and return command line arguments.
     """
     parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>.')
@@ -105,7 +105,7 @@ def get_args():
     return parser.parse_args()
 
 def get_serial_ports():
-    """
+    """\
     Return generator for available serial ports.
     """
     if platform.system() == 'Windows':
@@ -123,7 +123,7 @@ def get_serial_ports():
             yield port[0]
 
 def parse_status_header(status):
-    """
+    """\
     Extract data from Light Log status header, returning a dictionary.
     """
     status_list = [i.split(':') for i in status.split(';')]
@@ -148,7 +148,7 @@ def parse_status_header(status):
     return status_dict
 
 def convert_to_lux(red, green, blue, white, status_dict):
-    """
+    """\
     Use pre-fitted average lux test data function to convert to lux.
     
     Idealy this function should use the current devices calibration data
@@ -182,7 +182,7 @@ def convert_to_lux(red, green, blue, white, status_dict):
         return 0, 0, 0, int(round(white))
 
 def linear_interpolation(x):
-    """
+    """\
     Linear interpolation between recorded data point values.
     """
     CALIBRATION_DATA =  {'0': 0, '1': 28, '10': 60, '50': 213, '100': 296, '200': 406, '300': 461, '500': 531, '1000': 633, '2500': 794, '5000': 838, '10000': 862, '20000': 887, '54000': 902, '58000': 903, '60000': 904, '66000': 905, '80000': 908, '85000': 909, '116000': 917}
@@ -252,7 +252,7 @@ def linear_interpolation(x):
     return x
 
 def inverse_harris(x):
-    """
+    """\
     Curve fitted lux function http://zunzun.com/Equation/2/YieldDensity/InverseHarris/
     """
     x = float(x)
@@ -262,7 +262,7 @@ def inverse_harris(x):
     return x / (a + b * x ** c)
 
 def ramberg_osgood_fit(x):
-    """
+    """\
     Curve fitted lux function http://zunzun.com/Equation/2/Engineering/Ramberg-Osgood/
     """
     x = float(x)
@@ -272,7 +272,7 @@ def ramberg_osgood_fit(x):
     return (x / youngs_modulus) + (x / k) ** (1.0 / n)
 
 def exponential_fit(x):
-    """
+    """\
     Curve fitted lux function http://zunzun.com/Equation/2/Exponential/Exponential/
     """
     x = float(x)
