@@ -308,10 +308,10 @@ def extract_data(data, args, seconds_now, status_dict):
     seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
     for i in range(0, len(data), 6):
 
-        rgb = [ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256),
-               ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64),
-               ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16),
-               ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)]
+        r = ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256)
+        g = ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64)
+        b = ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16)
+        w = ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)
                         
         flags = ord(data[i + 5]) >> 6
         # 11 = reboot
@@ -320,11 +320,9 @@ def extract_data(data, args, seconds_now, status_dict):
         # 00 = OK
         
         if args.lux:
-            rgb[0], rgb[1], rgb[2], rgb[3] = convert_to_lux(rgb[0], rgb[1],
-                                                            rgb[2], rgb[3],
-                                                            status_dict)
+            r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
                                     
-        data_rows.append([rgb[0], rgb[1], rgb[2], rgb[3], seconds, flags])
+        data_rows.append([r, g, b, w, seconds, flags])
         seconds += STEP_SECONDS
 
     return data_rows
