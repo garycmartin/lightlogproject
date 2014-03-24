@@ -162,24 +162,13 @@ def convert_to_lux(red, green, blue, white, status_dict):
     RGB values are not (yet) calibrated to a set of known colour sources.
     """
 
-    if white > 0:
-        white = linear_interpolation(white)
-        #white = ramberg_osgood_fit(white)
-        #white = inverse_harris(white)
-        #white = exponential_fit(white)
-    else:
-        white = 0.0
-        
-    if red + green + blue > 0:
-        red_value = int(round(white * (float(red) / (red + green + blue))))
-        green_value = int(round(white * (float(green) / (red + green + blue))))
-        blue_value = int(round(white * (float(blue) / (red + green + blue))))
-        white = red_value + green_value + blue_value
-        return red_value, green_value, blue_value, white
-                                                                          
-                                                                          
-    else:
-        return 0, 0, 0, int(round(white))
+    r = int(round(linear_interpolation(red)))
+    g = int(round(linear_interpolation(green)))
+    b = int(round(linear_interpolation(blue)))
+    w = int(round(linear_interpolation(white)))
+           
+    return r, g, b, w
+
 
 def linear_interpolation(x):
     """\
