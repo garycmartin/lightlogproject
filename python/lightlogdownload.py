@@ -226,6 +226,7 @@ def download_data_from_lightlog(ser, args):
     communication_phase = 0
     data = ''
     seconds_now = None
+    expect_data = True
 
     while True:
         time.sleep(0.001) # free up some cpu
@@ -233,7 +234,7 @@ def download_data_from_lightlog(ser, args):
             # Data downloaded
             break
 
-        if time.time() - timer > wait_time:
+        if time.time() - timer > wait_time or not expect_data:
             # Give up waiting
             break
 
@@ -245,12 +246,14 @@ def download_data_from_lightlog(ser, args):
 
             if data[-6:] == 'Hello?':
                 data = ''
+                expect_data = False
             
                 if communication_phase == 0:
                     if args.status:
                         ser.write('a') # a = request status output
                     elif args.eeprom:
                         ser.write('d') # d = dump all eprom data
+                        expect_data = True
                     elif args.reset:
                         ser.write('e') # e = reset mem pointer!
                     elif args.zero_reboot_count:
@@ -273,8 +276,9 @@ def download_data_from_lightlog(ser, args):
                         ser.write('z') # z = first boot init (but not leave calibration alone)!
                     else:
                         ser.write('c') # c = download
+                        expect_data = True
                     communication_phase = 1
-                    print >> sys.stderr, 'Communicating with Light Log'
+                    print >> sys.stderr, 'Communicating with Light Log device.'
                     # Grab current time now
                     seconds_now = int((datetime.datetime.now() - \
                                   datetime.datetime(1970,1,1,0,0)).total_seconds())
@@ -286,7 +290,7 @@ def download_data_from_lightlog(ser, args):
     if len(data) > 512:
         print >> sys.stderr
         
-    return data, seconds_now
+    return data, seconds_now, expect_data
 
 def extract_data(data, args, seconds_now, status_dict):
     """\
@@ -353,11 +357,10 @@ def main():
             pass
             
         else:
-            print >> sys.stderr, ser.name
             print >> sys.stderr, "Trying %s\n(press Light Log button)...%s" % (port, LINE_UP)
-            data, seconds_now = download_data_from_lightlog(ser, args)
+            data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
-            if len(data) > 0:
+            if len(data) > 0 or not expect_data:
                 break
         
     if data[-8:] == 'data_eof':
@@ -380,7 +383,7 @@ def main():
         status_dict = parse_status_header(data)
         print >> sys.stderr, "Status:", status_dict
 
-    else:
+    elif expect_data:
         print >> sys.stderr, "Failed to communicate with Light Log device."
     
 if __name__ == '__main__':
