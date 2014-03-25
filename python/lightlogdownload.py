@@ -65,6 +65,9 @@ def get_args():
     group_download.add_argument("--csv-header",
                                 help="outputs column header in first row",
                                 action="store_true")
+    group_download.add_argument("-a", "--auto-name",
+                                help="Use epoch and device ID for file name",
+                                action="store_true")
 
     group_version = parser.add_mutually_exclusive_group()
     group_version.add_argument("-v", "--version",
@@ -380,6 +383,9 @@ def main():
         data_rows = extract_data(data, args, seconds_now, status_dict)
         print >> sys.stderr, "Downloaded", len(data_rows),
         print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
+
+        if args.auto_name:
+            args.output = '%s_%s.csv' % (seconds_now - STEP_SECONDS, status_dict['ID'])
 
         if args.output:
             output_data_to_file(data_rows, args)
