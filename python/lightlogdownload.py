@@ -52,55 +52,52 @@ def get_args():
     """\
     Parse and return command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>. Used with no file arguments the data wil be directed to the conssole standard out.')
+    parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>. Used with no file arguments the data wil be directed to the console standard out. Common usage example: python lightlogdownload.py --lux --auto-name')
+    
     parser.add_argument("-p", "--port",
-                       help="serial port device or com name")
+                        help="serial or COM port name")
+    parser.add_argument("-l", "--lux",
+                        help="convert raw sensor data to lux",
+                        action="store_true")
+    parser.add_argument("--csv-header",
+                        help="outputs column header in first row",
+                        action="store_true")
+    parser.add_argument("--eeprom",
+                        help="download all eeprom data (for debug and data recovery)",
+                        action="store_true")
 
-    group_download = parser.add_mutually_exclusive_group()
-    group_download.add_argument("-l", "--lux",
-                                help="convert raw sensor data to lux",
-                                action="store_true")
-    group_download.add_argument("-o", "--output",
-                                help="output to file name (csv format)")
-    group_download.add_argument("--csv-header",
-                                help="outputs column header in first row",
-                                action="store_true")
-    group_download.add_argument("-a", "--auto-name",
-                                help="Use epoch and device ID for file name",
-                                action="store_true")
-
-    group_version = parser.add_mutually_exclusive_group()
-    group_version.add_argument("-v", "--version",
-                                help="show version number",
-                                action="store_true")
-                        
     group = parser.add_mutually_exclusive_group()
+    group.add_argument("-o", "--output",
+                       help="output to a named file (csv text)")
+    group.add_argument("-a", "--auto-name",
+                       help="output to a auto-named file <epoch>_<deviceID>.csv",
+                       action="store_true")
+    group.add_argument("--reset",
+                       help="reset memory pointer (for a fresh logging session)",
+                       action="store_true")
     group.add_argument("-s", "--status",
                        help="display device status data",
                        action="store_true")
-    group.add_argument("--eeprom",
-                       help="download all eeprom data",
-                       action="store_true")
-    group.add_argument("--reset",
-                       help="reset memory pointer",
+    group.add_argument("-v", "--version",
+                       help="show version number and exit",
                        action="store_true")
     group.add_argument("--zero-reboot-count",
-                       help="zero reboot counter",
+                       help="zero reboot counter (for hardware debugging)",
                        action="store_true")
     group.add_argument("--calibrate",
-                       help="calibrate to 2.5K lux light source",
+                       help="calibrate hardware to known lux light sources",
                        choices=['lux2500', 'lux5000', 'lux10000', 'lux20000'])
     group.add_argument("-z", "--zero-goal",
                        help="zero light goal",
                        action="store_true")
     group.add_argument("--zero-day-phase",
-                       help="zero day phase (peak sleep point)",
+                       help="zero day phase (set now as peak sleep point)",
                        action="store_true")
     group.add_argument("--half-day-phase",
-                       help="half day phase (peak sleep point + 12hrs)",
+                       help="half day phase (set + 12hrs as peak sleep point)",
                        action="store_true")
     group.add_argument("--first-boot-init",
-                       help="manually trigger first boot init",
+                       help="manually trigger device first boot init (!!!)",
                        action="store_true")
                        
     if parser.parse_args().version:
