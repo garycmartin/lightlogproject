@@ -124,6 +124,15 @@ def get_serial_ports():
         for port in list_ports.comports():
             yield port[0]
 
+def find_and_return_custom_cable():
+    """\
+    Search for a serial port matching the custom PICAXE cable name.
+    """
+    for p in serial.tools.list_ports.comports():
+        if 'PICAXE' in p[1]:
+            return p[0]
+    return None
+
 def parse_status_header(status):
     """\
     Extract data from Light Log status header, returning a dictionary.
@@ -353,7 +362,9 @@ def main():
     if args.port:
         serial_ports = [args.port]
     else:
-        serial_ports = list(get_serial_ports())[::-1]
+        serial_ports = [find_and_return_custom_cable()]
+        if serial_ports == [None]:
+            serial_ports = list(get_serial_ports())[::-1]
     
     if len(serial_ports) == 0:
         print >> sys.stderr, "No serial devices available."
