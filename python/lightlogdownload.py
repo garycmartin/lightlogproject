@@ -290,8 +290,6 @@ def download_data_from_lightlog(ser, args):
                 message_update += 2048
                 sys.stdout.write('.')
                 sys.stdout.flush()
-
-    print >> sys.stderr
         
     return data, seconds_now, expect_data
 
@@ -364,16 +362,17 @@ def main():
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
+                print >> sys.stderr
                 break
         
     if data[-8:] == 'data_eof':
         # Strip off status head from data
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
-        print >> sys.stderr, "Status:", status_dict
         
         data_rows = extract_data(data, args, seconds_now, status_dict)
-        print >> sys.stderr, "Downloaded", len(data_rows), "samples."
+        print >> sys.stderr, "Downloaded", len(data_rows),
+        print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
 
         if args.output:
             output_data_to_file(data_rows, args.output)
