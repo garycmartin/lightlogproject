@@ -294,7 +294,10 @@ def download_data_from_lightlog(ser, args):
                 message_update += 2048
                 sys.stdout.write('.')
                 sys.stdout.flush()
-        
+
+    if communication_phase == 1:
+        print >> sys.stderr
+
     return data, seconds_now, expect_data
 
 def extract_data(data, args, seconds_now, status_dict):
@@ -372,7 +375,6 @@ def main():
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
-                print >> sys.stderr
                 break
         
     if data[-8:] == 'data_eof':
