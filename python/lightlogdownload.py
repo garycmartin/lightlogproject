@@ -63,7 +63,8 @@ def get_args():
     group_download.add_argument("-o", "--output",
                                 help="output file name (csv format)")
     group_download.add_argument("--csv-header",
-                                help="outputs column header in first row")
+                                help="outputs column header in first row",
+                                action="store_true")
 
     group_version = parser.add_mutually_exclusive_group()
     group_version.add_argument("-v", "--version",
@@ -321,19 +322,25 @@ def extract_data(data, args, seconds_now, status_dict):
 
     return data_rows
 
-def output_data_to_file(data_rows, file_name):
+def output_data_to_file(data_rows, args):
     """\
     Output data rows to file.
     """
-    f = open(file_name, "a")    
+    if args.csv_header:
+        print "red,green,blue,white,epoch,flags"
+
+    f = open(args.output, "a")    
     for row in data_rows:
         f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
     f.close()
 
-def output_data_to_stdout(data_rows):
+def output_data_to_stdout(data_rows, args):
     """\
     Output data rows to std out.
     """
+    if args.csv_header:
+        print "red,green,blue,white,epoch,flags"
+        
     for row in data_rows:
         print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
 
@@ -375,9 +382,9 @@ def main():
         print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
 
         if args.output:
-            output_data_to_file(data_rows, args.output)
+            output_data_to_file(data_rows, args)
         else:
-            output_data_to_stdout(data_rows)
+            output_data_to_stdout(data_rows, args)
 
     elif data[-8:] == 'head_eof':
         # Status header block only
