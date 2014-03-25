@@ -52,7 +52,7 @@ def get_args():
     """\
     Parse and return command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>.')
+    parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>. Used with no file arguments the data wil be directed to the conssole standard out.')
     parser.add_argument("-p", "--port",
                        help="serial port device or com name")
 
@@ -61,7 +61,7 @@ def get_args():
                                 help="convert raw sensor data to lux",
                                 action="store_true")
     group_download.add_argument("-o", "--output",
-                                help="output file name (csv format)")
+                                help="output to file name (csv format)")
     group_download.add_argument("--csv-header",
                                 help="outputs column header in first row",
                                 action="store_true")
