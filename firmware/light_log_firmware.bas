@@ -568,9 +568,6 @@ first_boot_init:
     gosub zero_light_goal
     gosub zero_day_phase
     write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
-    tmp = 0
-    write REGISTER_LOG_START_TIME_WORD1, word tmp
-    write REGISTER_LOG_START_TIME_WORD2, word tmp
 
     ; Generate unique hardware id (seed from sensor and battery readings)
     gosub read_RGBW_sensors
