@@ -52,53 +52,32 @@ def get_args():
     """\
     Parse and return command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Download and convert data from Light Log device <http://lightlogproject.org>. Used with no file arguments the data wil be directed to the console standard out. Common usage example: python lightlogdownload.py --lux --auto-name')
+    parser = argparse.ArgumentParser(description='Download, convert and save data from Light Log device. Without arguments data will be saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if the log file already exists, new data will be appended to the log.')
     
     parser.add_argument("-p", "--port",
                         help="serial or COM port name")
-    parser.add_argument("-l", "--lux",
-                        help="convert raw sensor data to lux",
+    parser.add_argument("-r", "--raw",
+                        help="raw 10-bit sensor data, no conversion to lux scale",
                         action="store_true")
     parser.add_argument("--csv-header",
-                        help="outputs column header in first row",
+                        help="outputs column header in first row of data",
                         action="store_true")
-    parser.add_argument("--eeprom",
-                        help="download all eeprom data (for debug and data recovery)",
+    parser.add_argument("-v", "--version",
+                        help="show download software version number and exit",
                         action="store_true")
 
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("-o", "--output",
-                       help="output to a named file (csv text)")
-    group.add_argument("-a", "--auto-name",
-                       help="output to a auto-named file <epoch>_<deviceID>.csv",
+    group.add_argument("-f", "--file",
+                       help="save downloaded data to a named file")
+    group.add_argument("--stdout",
+                       help="send data to console std out",
                        action="store_true")
-    group.add_argument("--reset",
-                       help="reset memory pointer (for a fresh logging session)",
-                       action="store_true")
-    group.add_argument("-s", "--status",
-                       help="display device status data",
-                       action="store_true")
-    group.add_argument("-v", "--version",
-                       help="show version number and exit",
-                       action="store_true")
-    group.add_argument("--zero-reboot-count",
-                       help="zero reboot counter (for hardware debugging)",
-                       action="store_true")
-    group.add_argument("--calibrate",
+    group.add_argument("--cmd",
+                       help="device command: a=display device status data; e=reset memory pointer (for a fresh logging session); f=zero reboot counter (for hardware debugging); l=zero daily light goal; m=zero day phase (define now as peak sleep point); n=half day phase (define + 12hrs as peak sleep point); z=trigger device first boot init (!!!).",
+                       choices=['a', 'e', 'f', 'l', 'm', 'n', 'z'])
+    group.add_argument("--cal",
                        help="calibrate hardware to known lux light sources",
-                       choices=['lux2500', 'lux5000', 'lux10000', 'lux20000'])
-    group.add_argument("-z", "--zero-goal",
-                       help="zero light goal",
-                       action="store_true")
-    group.add_argument("--zero-day-phase",
-                       help="zero day phase (set now as peak sleep point)",
-                       action="store_true")
-    group.add_argument("--half-day-phase",
-                       help="half day phase (set + 12hrs as peak sleep point)",
-                       action="store_true")
-    group.add_argument("--first-boot-init",
-                       help="manually trigger device first boot init (!!!)",
-                       action="store_true")
+                       choices=['2.5k', '5k', '10k', '20k'])
                        
     if parser.parse_args().version:
         print >> sys.stderr, "Version", VERSION
@@ -260,31 +239,28 @@ def download_data_from_lightlog(ser, args):
                 expect_data = False
             
                 if communication_phase == 0:
-                    if args.status:
+                    if args.cmd == 'a':
                         ser.write('a') # a = request status output
                         expect_data = True
-                    elif args.eeprom:
-                        ser.write('d') # d = dump all eprom data
-                        expect_data = True
-                    elif args.reset:
+                    elif args.cmd == 'e':
                         ser.write('e') # e = reset mem pointer!
-                    elif args.zero_reboot_count:
+                    elif args.cmd == 'f':
                         ser.write('f') # f = reset reboot counter
-                    elif args.calibrate == 'lux2500':
+                    elif args.cal == '2.5k':
                         ser.write('h') # h = calibrate to 2.5K lux source!!
-                    elif args.calibrate == 'lux5000':
+                    elif args.cal == '5k':
                         ser.write('i') # i = calibrate to 5K lux source!!
-                    elif args.calibrate == 'lux10000':
+                    elif args.cal == '10k':
                         ser.write('j') # j = calibrate to 10K lux source!!
-                    elif args.calibrate == 'lux20000':
+                    elif args.cal == '20k':
                         ser.write('k') # k = calibrate to 20K lux source!!
-                    elif args.zero_goal:
+                    elif args.cmd == 'l':
                         ser.write('l') # l = zero light goal
-                    elif args.zero_day_phase:
+                    elif args.cmd == 'm':
                         ser.write('m') # m = zero day phase (peak sleep point)
-                    elif args.half_day_phase:
+                    elif args.cmd == 'n':
                         ser.write('n') # n = half day phase (peak sleep point + half day)
-                    elif args.first_boot_init:
+                    elif args.cmd == 'z':
                         ser.write('z') # z = first boot init (but not leave calibration alone)!
                     else:
                         ser.write('c') # c = download
@@ -319,34 +295,85 @@ def extract_data(data, args, seconds_now, status_dict):
         g = ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64)
         b = ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16)
         w = ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)
-                        
+                                          
         flags = ord(data[i + 5]) >> 6
         # 11 = reboot
         # 01 = blocked sensors
         # 10 = button press
         # 00 = OK
         
-        if args.lux:
+        if args.raw:
+            # Raw sensor data
+            data_rows.append([r, g, b, w, seconds, flags])
+
+        else:
             r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
-                                    
-        data_rows.append([r, g, b, w, seconds, flags])
+            data_rows.append([r, g, b, w, seconds, flags])
+            
         seconds += STEP_SECONDS
 
     return data_rows
 
-def output_data_to_file(data_rows, args):
+def append_data_to_file(data_rows, args, status_dict):
     """\
-    Output data rows to file.
+    Append data to the end of an existing log file.
     """
-    if args.csv_header:
-        print "red,green,blue,white,epoch,flags"
+    try:
+        f = open(args.file, "rb")
+    except IOError:
+        # File does not exist so switch to creating a new file
+        output_data_to_file(data_rows, args, status_dict)
+    else:
+        last_log_end = get_timestamp_from_end_of_file(f)
+        time_correct = last_log_end
+        count_rows = 0
+        f.close()
+        
+        f = open(args.file, "a")
+        if data_rows[0][4] > last_log_end:
+            print >> sys.stderr, "WARNING: No overlap with existing log, all downloaded data is newer (there will be a gap in the time series)."
+            for row in data_rows:
+                f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+                count_rows += 1
+                
+        else:
+            # Append only newer data than existing log
+            for row in data_rows:
+                if row[4] > last_log_end:
+                    time_correct += STEP_SECONDS
+                    row[4] = time_correct
+                    f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+                    count_rows += 1
+        f.close()
+        
+        print >> sys.stderr, "Appended", count_rows,
+        print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
 
-    f = open(args.output, "a")    
+
+def get_timestamp_from_end_of_file(f):
+    f.seek(-2, 2)
+    while f.read(1) != "\n":
+        f.seek(-2, 1)
+    return int(f.readline().split(',')[4])
+
+def output_data_to_file(data_rows, args, status_dict):
+    """\
+    Output data rows to file, will overwrite if file already exists.
+    """
+    f = open(args.file, "w")
+
+    if args.csv_header:
+        f.write("red,green,blue,white,epoch,flags\n")
+
     for row in data_rows:
         f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
     f.close()
+    
+    print >> sys.stderr, "Wrote", len(data_rows),
+    print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
 
-def output_data_to_stdout(data_rows, args):
+
+def output_data_to_stdout(data_rows, args, status_dict):
     """\
     Output data rows to std out.
     """
@@ -355,6 +382,10 @@ def output_data_to_stdout(data_rows, args):
         
     for row in data_rows:
         print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
+
+    print >> sys.stderr, "Downloaded", len(data_rows),
+    print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
+
 
 def main():
     args = get_args()
@@ -391,16 +422,18 @@ def main():
         status_dict = parse_status_header(status)
         
         data_rows = extract_data(data, args, seconds_now, status_dict)
-        print >> sys.stderr, "Downloaded", len(data_rows),
-        print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
 
-        if args.auto_name:
-            args.output = '%s_%s.csv' % (seconds_now - STEP_SECONDS, status_dict['ID'])
-
-        if args.output:
-            output_data_to_file(data_rows, args)
+        if not args.file:
+            if args.raw:
+                args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
+            else:
+                args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
+                        
+        if args.stdout:
+            output_data_to_stdout(data_rows, args, status_dict)
+            
         else:
-            output_data_to_stdout(data_rows, args)
+            append_data_to_file(data_rows, args, status_dict)
 
     elif data[-8:] == 'head_eof':
         # Status header block only
