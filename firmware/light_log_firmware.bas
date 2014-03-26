@@ -48,11 +48,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #no_data ; Make sure re-programming does not zap eprom memory
 #picaxe 14m2
 
-;#define DEBUG_SENSORS ; Debug output for sensor data
-;#define DEBUG_BUTTON ; Debug output for button state
-;#define DEBUG_WRITE ; Debug output for data written to eprom
-;#define DEBUG_FIRST_BOOT
-
 init:
     ; Save all the power we can
     disablebod
@@ -180,15 +175,6 @@ main:
             white_avg = white + white_avg
         endif
 
-        #ifdef DEBUG_SENSORS
-            gosub high_speed
-            sertxd("Sensors: R=", #red, _
-                   ", G=", #green, _
-                   ", B=", #blue, _
-                   ", W=", #white, 13)
-            gosub low_speed
-        #endif
-
         gosub low_power_delay
         gosub check_user_button
         gosub low_power_delay
@@ -268,19 +254,6 @@ main:
     hi2cout tmp, (extra_byte, flag)
 	tmp = tmp + 2
 
-    ; Debug sensor output
-    #ifdef DEBUG_WRITE
-        gosub high_speed
-        sertxd("Write to ", #tmp, _
-               ", R=", #red_byte, _
-               ", G=", #green_byte, _
-               ", B=", #blue_byte, _
-               ", W=", #white_byte, _
-               ", E=", #extra_byte, _
-               ", F=", #flag, 13)
-        gosub low_speed
-    #endif
-
     flag = FLAG_OK ; Clear any flag states
 
     ; Increment and write current position to micro eprom (mem bytes = 65536)
@@ -314,16 +287,6 @@ read_RGBW_sensors:
     return
 
 check_user_button:
-    #ifdef DEBUG_BUTTON
-        gosub high_speed
-        if EVENT_BUTTON = 0 then
-            sertxd("Button ON", 13)
-        else
-            sertxd("Button OFF", 13)
-        endif
-        gosub low_speed
-    #endif
-
     if EVENT_BUTTON = 0 then
         gosub high_speed
         flag = flag | FLAG_BUTTON
@@ -640,15 +603,6 @@ first_boot_init:
     tmp = FIRST_BOOT_PASS_WORD
     write REGISTER_FIRST_BOOT_PASS_WORD, word tmp
 
-    #ifdef DEBUG_FIRST_BOOT
-        gosub high_speed
-        sertxd("First boot", 13)
-        read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-        sertxd("Unique ID: ", #tmp)
-        read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-        sertxd(", ", #tmp, 13)
-        gosub low_speed
-    #endif
     return
 
 zero_light_goal:
