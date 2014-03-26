@@ -85,8 +85,6 @@ init:
     symbol REGISTER_UNIQUE_HW_ID_WORD1 = 5
     symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
     symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
-    symbol REGISTER_LOG_START_TIME_WORD1 = 11
-    symbol REGISTER_LOG_START_TIME_WORD2 = 13
 
     symbol REGISTER_2_5KLUX_RED_WORD = 15
     symbol REGISTER_2_5KLUX_GREEN_WORD = 17
@@ -477,10 +475,6 @@ header_block:
     sertxd("Pointer:", #tmp, ";")
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp
     sertxd("Wrap:", #tmp, ";")
-	read REGISTER_LOG_START_TIME_WORD1, word tmp
-    sertxd("Start:", #tmp)
-	read REGISTER_LOG_START_TIME_WORD2, word tmp
-    sertxd(",", #tmp, ";")
     read REGISTER_2_5KLUX_RED_WORD, word tmp
     sertxd("2.5KluxR:", #tmp, ";")
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp
