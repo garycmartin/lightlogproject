@@ -173,10 +173,10 @@ def convert_to_lux(red, green, blue, white, status_dict):
     RGB values are not (yet) calibrated to a set of known colour sources.
     """
 
-    r = int(round(linear_interpolation(red)))
-    g = int(round(linear_interpolation(green)))
-    b = int(round(linear_interpolation(blue)))
-    w = int(round(linear_interpolation(white)))
+    r = float('%.4f' % linear_interpolation(red))
+    g = float('%.4f' % linear_interpolation(green))
+    b = float('%.4f' % linear_interpolation(blue))
+    w = float('%.4f' % linear_interpolation(white))
            
     return r, g, b, w
 
