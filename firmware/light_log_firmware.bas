@@ -396,9 +396,6 @@ check_serial_comms:
         case "c"
         gosub dump_data
 
-        case "d"
-        gosub dump_all_eprom_data
-
         case "e"
         gosub reset_pointer
 
@@ -527,14 +524,6 @@ dump_data:
         gosub dump_from_index_to_end
     endif
     gosub dump_up_to_index
-    sertxd("data_eof")
-    return
-
-dump_all_eprom_data:
-    ; Debug output all eprom data in memory order
-    gosub header_block
-    gosub dump_up_to_index:
-    gosub dump_from_index_to_end
     sertxd("data_eof")
     return
 
