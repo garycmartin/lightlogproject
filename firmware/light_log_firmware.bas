@@ -489,6 +489,7 @@ header_block:
     sertxd("Pointer:", #tmp, ";")
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp
     sertxd("Wrap:", #tmp, ";")
+    sertxd("Period:", #SECONDS_PER_RECORD, ";")
     read REGISTER_2_5KLUX_RED_WORD, word tmp
     sertxd("2.5KluxR:", #tmp, ";")
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp
