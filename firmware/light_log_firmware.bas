@@ -55,7 +55,7 @@ init:
     disconnect
     gosub low_speed
 
-    symbol FIRMWARE_VERSION = 18
+    symbol FIRMWARE_VERSION = 19
     symbol HARDWARE_VERSION = 3
 
     symbol LED = C.1
@@ -70,7 +70,8 @@ init:
     pullup %0000100000000000
 
     ; 63 = max (due to word int maths and avg overflow risk)
-    symbol SAMPLES_PER_AVERAGE = 15
+    symbol SAMPLES_PER_AVERAGE = 6
+	symbol SECONDS_PER_RECORD = SAMPLES_PER_AVERAGE * 10
 
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
@@ -173,9 +174,15 @@ main:
             white_avg = white + white_avg
         endif
 
-        gosub low_power_delay
+        gosub low_power_delay_1_1
         gosub check_user_button
-        gosub low_power_delay
+        gosub low_power_delay_2_2
+        gosub check_user_button
+        gosub low_power_delay_2_2
+        gosub check_user_button
+        gosub low_power_delay_2_2
+        gosub check_user_button
+        gosub low_power_delay_2_3
         gosub check_user_button
     next sample_loop
 
@@ -270,9 +277,19 @@ main:
 
     goto main
 
-low_power_delay:
+low_power_delay_1_1:
     ; Save power and sleep
-    nap 6 : nap 5 : nap 4 : nap 0 : nap 0 ; ~2sec
+	nap 6 ; 1.1sec
+    return
+
+low_power_delay_2_2:
+    ; Save power and sleep
+	nap 6 : nap 6 ; 2.2sec
+    return
+
+low_power_delay_2_3:
+    ; Save power and sleep
+	nap 7 ; 2.3sec
     return
 
 read_RGBW_sensors:
