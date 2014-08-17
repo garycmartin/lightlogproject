@@ -110,6 +110,8 @@ init:
 
     symbol REGISTER_MEMORY_WRAPPED_WORD = 51
 
+    symbol REGISTER_BUTTON_LATCHED_WORD = 53
+
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
     symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
@@ -315,7 +317,14 @@ read_RGBW_sensors:
 
 check_user_button:
     if EVENT_BUTTON = 0 then
-        gosub high_speed
+		read REGISTER_BUTTON_LATCHED_WORD, word tmp
+		if tmp > 3 then
+            return
+        endif
+        tmp = tmp + 1
+        write REGISTER_BUTTON_LATCHED_WORD, word tmp
+
+        gosub med_speed
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
 
@@ -328,6 +337,7 @@ check_user_button:
         ; Prevent program upload (saves power)
         disconnect
 
+        gosub high_speed
         read REGISTER_LIGHT_GOAL_WORD, word tmp
         if tmp >= 60000 then
             ; Minimim recommended light goal reached
@@ -352,6 +362,9 @@ check_user_button:
             gosub pulse_led
         endif
         gosub low_speed
+    else
+        tmp = 0
+        write REGISTER_BUTTON_LATCHED_WORD, word tmp
     endif
 
     return
