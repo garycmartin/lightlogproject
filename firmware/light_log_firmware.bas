@@ -389,42 +389,34 @@ pulse_led:
 
 slow_pulse_led:
     ; Fade up
-	for tmp = 0 to 13000 step 1300
-        high LED
-        pauseus tmp
-        low LED
-        gosub pulse_led_delay
+    for tmp = 0 to 150 step 10
+        gosub pulse_timing
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 1300
-        high LED
-        gosub pulse_led_delay
-        low LED
-        pauseus tmp
+	for tmp = 150 to 0 step -10
+        gosub pulse_timing
     next tmp
     return
 
 fast_pulse_led:
     ; Fade up
-	for tmp = 0 to 13000 step 3250
-        high LED
-        pauseus tmp
-        low LED
-        gosub pulse_led_delay
+    for tmp = 0 to 150 step 25
+        gosub pulse_timing
     next tmp
     ; Fade down
-	for tmp = 0 to 13000 step 3250
-        high LED
-        gosub pulse_led_delay
-        low LED
-        pauseus tmp
+	for tmp = 150 to 0 step -25
+        gosub pulse_timing
     next tmp
     return
 
-pulse_led_delay:
-    tmp = 13000 - tmp
-    pauseus tmp
-    tmp = 13000 - tmp
+pulse_timing:
+    high LED
+    tmp2 = tmp * tmp
+    pauseus tmp2
+    low LED
+    tmp2 = 150 - tmp
+    tmp2 = tmp2 * tmp2
+    pauseus tmp2
     return
 
 check_serial_comms:
