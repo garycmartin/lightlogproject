@@ -45,8 +45,9 @@ import argparse
 import serial
 from serial.tools import list_ports
 
-STEP_SECONDS = 60 # default
 VERSION = 'v0.1'
+#SERIAL_BAUD = 38400
+SERIAL_BAUD = 19200
 
 def get_args():
     """\
@@ -404,8 +405,8 @@ def main():
     for port in serial_ports:
         try:
             # Open serial connection
-            ser = serial.Serial(port, 38400, timeout=0)
-            
+            ser = serial.Serial(port, SERIAL_BAUD, timeout=0)
+
         except (OSError, IOError):
             pass
 
