@@ -39,7 +39,7 @@ POSSIBILITY OF SUCH DAMAGE.
                In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
              Sensors enable C.4 -|3  12|- B.1 Red ADC
                      Button C.3 -|4  11|- B.2 Green ADC
-                            C.2 -|5  10|- B.3 hi2c scl
+                  I2C_POWER C.2 -|5  10|- B.3 hi2c scl
                         LED C.1 -|6   9|- B.4 hi2c sda
                   Clear ADC C.0 -|7   8|- B.5 Blue ADC
                                   –––––
@@ -59,6 +59,7 @@ init:
     symbol HARDWARE_VERSION = 3
 
     symbol LED = C.1
+    symbol I2C_POWER = C.2
     symbol SENSOR_POWER = C.4
     symbol SENSOR_RED = B.1
     symbol SENSOR_GREEN = B.2
@@ -174,15 +175,15 @@ main:
             white_avg = white + white_avg
         endif
 
-        gosub low_power_delay_1_1
+        gosub delay_2sec
         gosub check_user_button
-        gosub low_power_delay_2_2
+        gosub delay_2sec
         gosub check_user_button
-        gosub low_power_delay_2_2
+        gosub delay_2sec
         gosub check_user_button
-        gosub low_power_delay_2_2
+        gosub delay_2sec
         gosub check_user_button
-        gosub low_power_delay_2_3
+        gosub delay_2sec
         gosub check_user_button
     next sample_loop
 
@@ -277,19 +278,19 @@ main:
 
     goto main
 
-low_power_delay_1_1:
-    ; Save power and sleep
-	nap 6 ; 1.1sec
-    return
-
-low_power_delay_2_2:
-    ; Save power and sleep
-	nap 6 : nap 6 ; 2.2sec
-    return
-
-low_power_delay_2_3:
-    ; Save power and sleep
-	nap 7 ; 2.3sec
+delay_2sec:
+    ; Delay for 2 sec without using the low power sleep watchdog timer 
+	; More accurate, avoids intermittent crashes, but uses more power
+    low I2C_POWER
+    setfreq k31
+    ;pauseus 1389 ; my daily worn test unit
+    ;pauseus 1380 ; white case with green sensor error
+    ;pauseus 1344 ; red case in livingroom window
+    ;pauseus 1318 ; red case on lamp in livingroom
+    pauseus 1286 ; blue case fridge
+    ;pauseus 1484 ; blue case bedroom window
+    setfreq m1
+    high I2C_POWER
     return
 
 read_RGBW_sensors:
