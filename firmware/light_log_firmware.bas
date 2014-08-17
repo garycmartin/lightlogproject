@@ -657,11 +657,18 @@ default_light_calibration:
     return
 
 high_speed:
-    setfreq m32; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, %10100000, i2cfast_32, i2cword
+	; User LED feedback
+    setfreq m32 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    return
+
+med_speed:
+	; 19200 comms to save power during sync
+    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    hi2csetup i2cmaster, %10100000, i2cfast_16, i2cword
     return
 
 low_speed:
-    setfreq k500; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    ; Sensor read and average i2c write loop
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     hi2csetup i2cmaster, %10100000, i2cfast, i2cword
     return
