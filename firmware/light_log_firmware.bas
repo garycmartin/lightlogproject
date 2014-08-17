@@ -239,11 +239,25 @@ main:
     endif
     write REGISTER_DAY_PHASE_WORD, word tmp
 
+    ; Prepair to write data to eprom
+    read REGISTER_LAST_SAVE_WORD, word tmp
+
     ; Store least significant bytes
     red_byte = red_avg     & %11111111
+    hi2cout tmp, (red_byte)
+	tmp = tmp + 1
+
     green_byte = green_avg & %11111111
+    hi2cout tmp, (green_byte)
+	tmp = tmp + 1
+
     blue_byte = blue_avg   & %11111111
+    hi2cout tmp, (blue_byte)
+	tmp = tmp + 1
+
     white_byte = white_avg & %11111111
+    hi2cout tmp, (white_byte)
+	tmp = tmp + 1
 
     ; Fill extra_byte with 9th and 10th bits of each RGBT
     extra_byte = red_avg   & %1100000000 / 256
@@ -251,18 +265,15 @@ main:
     extra_byte = blue_avg  & %1100000000 / 16 + extra_byte
     extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
-    ; Write data to eprom
-    read REGISTER_LAST_SAVE_WORD, word tmp
-    hi2cout tmp, (red_byte, green_byte)
-	tmp = tmp + 2
-    hi2cout tmp, (blue_byte, white_byte)
-	tmp = tmp + 2
-    hi2cout tmp, (extra_byte, flag)
-	tmp = tmp + 2
+    hi2cout tmp, (extra_byte)
+	tmp = tmp + 1
+
+    hi2cout tmp, (flag)
+	tmp = tmp + 1
 
     flag = FLAG_OK ; Clear any flag states
 
-    ; Increment and write current position to micro eprom (mem bytes = 65536)
+    ; Increment and write current position to micro eprom
 	if tmp >= LAST_VALID_RECORD then
         tmp = 0
         write REGISTER_LAST_SAVE_WORD, word tmp
