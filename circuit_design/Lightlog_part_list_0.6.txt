@@ -1,7 +1,7 @@
 === Light Log SMD/SMT prototype v0.6 part list ===
 
 Surface Mount PICAXE-14M2 [AXE017M2SM]
-24LC512-I/SM 64Kb Microchip EEPROM SMT slim SOIC-8 3.9mm width package
+24AA512-I/SN 64Kb Microchip EEPROM SMT slim SOIC-8 3.9mm width package (with extra low 1.7V drop-out)
 TCS34725FN ams RGBC Light to Digital Converters (with IR filter)
 C1. 100nF decoupling capacitor Y5V0805CTTE105Z Ceramic Capacitors MLCC - SMD/SMT
 LED1, LED2, LED3, LED4, LED5 white VAOL-S12WR4 Standard LED - SMD
@@ -11,7 +11,7 @@ R2 10Kohm SG73P2ATTD1002F KOA Speer Thick Film Resistors SMD (stops serial in fr
 R3, R4 4.7Kohm SG73S2ATTD4701F KOA Speer Thick Film Resistors SMD (pull-ups for I2C)
 R5, R6, R7, R8, R9 50ohm-100ohm SG73P2ATTD1000F KOA Speer Thick Film Resistors SMD (LED current limit)
 SW1 Tactile side button SW04440 MICROSWITCH, MINIATURE; Actuation Type:S KMS231G LFS, C&K COMPONENTS
-3.5mm stereo socket SMD/SMT [CON039SM]
+3.5mm stereo socket MJ4435-R SMD/SMT [CON039SM]
 USB to 3.5mm jack FTDI based serial cable [AXE027] (for Pic serial programming and data sync)
 CR2032 Coin cell battery 3V (circuit operating range 2.1V-5.5V, 240mAh will last >4 months)
 
