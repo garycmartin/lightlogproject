@@ -53,7 +53,7 @@ def get_args():
     Parse and return command line arguments.
     """
     parser = argparse.ArgumentParser(description='Download, convert and save data from Light Log device. Without arguments data will be saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if the log file already exists, new data will be appended to the log.')
-    
+
     parser.add_argument("-p", "--port",
                         help="serial or COM port name")
     parser.add_argument("-r", "--raw",
@@ -78,7 +78,7 @@ def get_args():
     group.add_argument("--cal",
                        help="calibrate hardware to known lux light sources",
                        choices=['2.5k', '5k', '10k', '20k'])
-                       
+
     if parser.parse_args().version:
         print >> sys.stderr, "Version", VERSION
         sys.exit(0)
@@ -118,17 +118,17 @@ def parse_status_header(status):
     """
     status_list = [i.split(':') for i in status.split(';')]
     status_dict = dict(zip([i[0] for i in status_list], [i[1] for i in status_list]))
-    
+
     # Break out the individual R, G, B, and W values into a list
     status_dict['RGBW'] = map(int, status_dict['RGBW'].split(','))
-    
+
     # Make a nice hex string of the two word unique ID
     status_dict['ID'] = '%0.4X%0.4X' % (int(status_dict['ID'].split(',')[0]),
                                         int(status_dict['ID'].split(',')[1]))
 
     # Battery output in mV
     status_dict['Batt'] = int(status_dict['Batt'][:-2])
-    
+
     # Convert relavent strings to int
     for i in ('Goal', 'FW', '20KluxG', '20KluxB', '10KluxB', '20KluxW',
               '20KluxR', '5KluxB', '5KluxG', '5KluxR', '5KluxW', 'Phase',
@@ -140,12 +140,12 @@ def parse_status_header(status):
 def convert_to_lux(red, green, blue, white, status_dict):
     """\
     Use pre-fitted average lux test data function to convert to lux.
-    
-    Idealy this function should use the current devices calibration data
+
+    Ideally this function should use the current devices calibration data
     status_dict['2.5KluxW'], status_dict['5KluxW'], status_dict['10KluxW']
     status_dict['20KluxW'], etc to convert sensor data to lux. Currently
     this function has been pre-fitted to average calibration data from
-    multiple devices.    
+    multiple devices.
         RGB values are scaled relative to the clear sensor lux value as an
     estimate for how much each section of the spectra may map into the
     total lux value (lux is a measurement of the total visible spectrum EMF).
@@ -156,7 +156,7 @@ def convert_to_lux(red, green, blue, white, status_dict):
     g = float('%.4f' % linear_interpolation(green))
     b = float('%.4f' % linear_interpolation(blue))
     w = float('%.4f' % linear_interpolation(white))
-           
+
     return r, g, b, w
 
 
@@ -237,7 +237,7 @@ def download_data_from_lightlog(ser, args):
             if data[-6:] == 'Hello?':
                 data = ''
                 expect_data = False
-            
+
                 if communication_phase == 0:
                     if args.cmd == 'a':
                         ser.write('a') # a = request status output
@@ -285,7 +285,7 @@ def download_data_from_lightlog(ser, args):
 def extract_data(data, args, seconds_now, status_dict):
     """\
     Parse raw byte data block and return a list of row light data.
-    """    
+    """
     data = data[:-8]
     data_rows = []
     seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
@@ -295,7 +295,7 @@ def extract_data(data, args, seconds_now, status_dict):
         g = ord(data[i + 1]) + ((ord(data[i + 4]) & 0b1100) * 64)
         b = ord(data[i + 2]) + ((ord(data[i + 4]) & 0b110000) * 16)
         w = ord(data[i + 3]) + ((ord(data[i + 4]) & 0b11000000) * 4)
-                                          
+
         flags = ord(data[i + 5]) >> 6
         # 11 = reboot
         # 01 = blocked sensors
@@ -328,14 +328,14 @@ def append_data_to_file(data_rows, args, status_dict):
         time_correct = last_log_end
         count_rows = 0
         f.close()
-        
+
         f = open(args.file, "a")
         if data_rows[0][4] > last_log_end:
             print >> sys.stderr, "WARNING: No overlap with existing log, all downloaded data is newer (there will be a gap in the time series)."
             for row in data_rows:
                 f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
                 count_rows += 1
-                
+
         else:
             # Append only newer data than existing log
             for row in data_rows:
@@ -345,7 +345,7 @@ def append_data_to_file(data_rows, args, status_dict):
                     f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
                     count_rows += 1
         f.close()
-        
+
         print >> sys.stderr, "Appended", count_rows,
         print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
 
@@ -368,7 +368,7 @@ def output_data_to_file(data_rows, args, status_dict):
     for row in data_rows:
         f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
     f.close()
-    
+
     print >> sys.stderr, "Wrote", len(data_rows),
     print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
 
@@ -379,7 +379,7 @@ def output_data_to_stdout(data_rows, args, status_dict):
     """
     if args.csv_header:
         print "red,green,blue,white,epoch,flags"
-        
+
     for row in data_rows:
         print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
 
@@ -389,18 +389,18 @@ def output_data_to_stdout(data_rows, args, status_dict):
 
 def main():
     args = get_args()
-    
+
     if args.port:
         serial_ports = [args.port]
     else:
         serial_ports = [find_and_return_custom_cable()]
         if serial_ports == [None]:
             serial_ports = list(get_serial_ports())[::-1]
-    
+
     if len(serial_ports) == 0:
         print >> sys.stderr, "No serial devices available."
         sys.exit(1)
-    
+
     for port in serial_ports:
         try:
             # Open serial connection
@@ -408,19 +408,19 @@ def main():
             
         except (OSError, IOError):
             pass
-            
+
         else:
             print >> sys.stderr, "Trying %s (press Light Log button)." % (port)
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
                 break
-        
+
     if data[-8:] == 'data_eof':
         # Strip off status head from data
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
-        
+
         data_rows = extract_data(data, args, seconds_now, status_dict)
 
         if not args.file:
@@ -431,7 +431,7 @@ def main():
                         
         if args.stdout:
             output_data_to_stdout(data_rows, args, status_dict)
-            
+
         else:
             append_data_to_file(data_rows, args, status_dict)
 
@@ -444,6 +444,6 @@ def main():
     elif expect_data:
         print >> sys.stderr, "Failed to communicate with Light Log."
         sys.exit(1)
-    
+
 if __name__ == '__main__':
     main()
