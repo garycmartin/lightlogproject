@@ -45,9 +45,10 @@ import argparse
 import serial
 from serial.tools import list_ports
 
-VERSION = 'v0.1'
 #SERIAL_BAUD = 38400
 SERIAL_BAUD = 19200
+STEP_SECONDS = 60 # default grab from status 'Period' if available
+VERSION = 'v0.11'
 
 def get_args():
     """\
@@ -59,6 +60,9 @@ def get_args():
                         help="serial or COM port name")
     parser.add_argument("-r", "--raw",
                         help="raw 10-bit sensor data, no conversion to lux scale",
+                        action="store_true")
+    parser.add_argument("-b", "--both",
+                        help="auto saves two files, raw 10-bit sensor data and one in lux",
                         action="store_true")
     parser.add_argument("--csv-header",
                         help="outputs column header in first row of data",
@@ -270,7 +274,7 @@ def download_data_from_lightlog(ser, args):
                     sys.stdout.write('Communicating with Light Log.')
                     sys.stdout.flush()
                     # Grab current time now
-                    seconds_now = int((datetime.datetime.now() - \
+                    seconds_now = int((datetime.datetime.now() -
                                   datetime.datetime(1970,1,1,0,0)).total_seconds())
 
             if len(data) > message_update:
@@ -302,22 +306,16 @@ def extract_data(data, args, seconds_now, status_dict):
         # 01 = blocked sensors
         # 10 = button press
         # 00 = OK
-        
-        if args.raw:
-            # Raw sensor data
-            data_rows.append([r, g, b, w, seconds, flags])
 
-        else:
-            r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
-            data_rows.append([r, g, b, w, seconds, flags])
-            
+        # Raw sensor data
+        data_rows.append([r, g, b, w, seconds, flags])
         seconds += STEP_SECONDS
 
     return data_rows
 
 def append_data_to_file(data_rows, args, status_dict):
     """\
-    Append data to the end of an existing log file.
+    Append data to the end of an existing log file, or create a new file if none exists.
     """
     try:
         f = open(args.file, "rb")
@@ -334,7 +332,7 @@ def append_data_to_file(data_rows, args, status_dict):
         if data_rows[0][4] > last_log_end:
             print >> sys.stderr, "WARNING: No overlap with existing log, all downloaded data is newer (there will be a gap in the time series)."
             for row in data_rows:
-                f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+                f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
                 count_rows += 1
 
         else:
@@ -343,7 +341,7 @@ def append_data_to_file(data_rows, args, status_dict):
                 if row[4] > last_log_end:
                     time_correct += STEP_SECONDS
                     row[4] = time_correct
-                    f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+                    f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
                     count_rows += 1
         f.close()
 
@@ -357,6 +355,7 @@ def get_timestamp_from_end_of_file(f):
         f.seek(-2, 1)
     return int(f.readline().split(',')[4])
 
+
 def output_data_to_file(data_rows, args, status_dict):
     """\
     Output data rows to file, will overwrite if file already exists.
@@ -367,7 +366,7 @@ def output_data_to_file(data_rows, args, status_dict):
         f.write("red,green,blue,white,epoch,flags\n")
 
     for row in data_rows:
-        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+        f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
     f.close()
 
     print >> sys.stderr, "Wrote", len(data_rows),
@@ -382,10 +381,23 @@ def output_data_to_stdout(data_rows, args, status_dict):
         print "red,green,blue,white,epoch,flags"
 
     for row in data_rows:
-        print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
+        print "%s,%s,%s,%s,%s,%s" % raw_or_lux_output(row, args, status_dict)
 
     print >> sys.stderr, "Downloaded", len(data_rows),
     print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
+
+
+def raw_or_lux_output(row, args, status_dict):
+    """\
+    Process raw red, green, blue, white data to lux if needed.
+    """
+    if args.raw:
+        # Raw sensor data
+        return (row[0], row[1], row[2], row[3], row[4], row[5])
+
+    else:
+        r, g, b, w = convert_to_lux(row[0], row[1], row[2], row[3], status_dict)
+        return (r, g, b, w, row[4], row[5])
 
 
 def main():
@@ -411,7 +423,7 @@ def main():
             pass
 
         else:
-            print >> sys.stderr, "Trying %s (press Light Log button)." % (port)
+            print >> sys.stderr, "Trying %s (press Light Log button)." % port
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
@@ -424,17 +436,31 @@ def main():
 
         data_rows = extract_data(data, args, seconds_now, status_dict)
 
-        if not args.file:
-            if args.raw:
-                args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
-            else:
-                args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
-                        
         if args.stdout:
             output_data_to_stdout(data_rows, args, status_dict)
 
         else:
-            append_data_to_file(data_rows, args, status_dict)
+            if not args.file:
+                if args.both:
+                    args.raw = True
+                    args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
+                    append_data_to_file(data_rows, args, status_dict)
+                    args.raw = None
+                    args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
+                    append_data_to_file(data_rows, args, status_dict)
+
+                elif args.raw:
+                    args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
+                    append_data_to_file(data_rows, args, status_dict)
+
+                else:
+                    args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
+                    append_data_to_file(data_rows, args, status_dict)
+
+            else:
+                append_data_to_file(data_rows, args, status_dict)
+
+        print >> sys.stderr, "Battery %dmV" % (status_dict['Batt'])
 
     elif data[-8:] == 'head_eof':
         # Status header block only
