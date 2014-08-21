@@ -24,7 +24,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
- 14M2 ADC inputs for RGB light level logging to i2c 64K eprom
+14M2 connectedt via I2C to RGBC light sensor and logging to 64K EEPROM
                                   _____
                              +V -|1 ^14|- 0V
                In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
@@ -37,34 +37,46 @@ POSSIBILITY OF SUCH DAMAGE.
                                   _____
                              +V -|1 ^14|- 0V
                In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
-             Sensors enable C.4 -|3  12|- B.1 Red ADC
-                     Button C.3 -|4  11|- B.2 Green ADC
-                  I2C_POWER C.2 -|5  10|- B.3 hi2c scl
-                        LED C.1 -|6   9|- B.4 hi2c sda
-                  Clear ADC C.0 -|7   8|- B.5 Blue ADC
+               SENSOR_POWER C.4 -|3  12|- B.1 LED5
+               EVENT_BUTTON C.3 -|4  11|- B.2 LED4
+               EEPROM_POWER C.2 -|5  10|- B.3 hi2c scl
+                       LED1 C.1 -|6   9|- B.4 hi2c sda
+                       LED2 C.0 -|7   8|- B.5 LED3
                                   –––––
+
 #endrem
 
-#no_data ; Make sure re-programming does not zap eprom memory
+; Lux calibration table (copied into data memory on first boot or factory reset)
+; Each sample is measured from broard spectrum white SAD light source
+; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 2.5k
+; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 5k
+; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 10k
+; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 20k
+table 15, (0x3C, 0x01, 0x63, 0x01, 0x3F, 0x01, 0xAD, 0x01, _
+           0x72, 0x01, 0xA1, 0x01, 0x7A, 0x01, 0xEA, 0x01, _
+           0xB3, 0x01, 0xE4, 0x01, 0xBE, 0x01, 0x2D, 0x02, _
+           0xE3, 0x01, 0xFB, 0x01, 0xD2, 0x01, 0x64, 0x02)
+
+#no_data ; Make sure re-programming does not zap eeprom data memory
 #picaxe 14m2
 
 init:
     ; Save all the power we can
-    disablebod
-    disabletime
-    disconnect
-    gosub low_speed
+    disablebod ; disable 1.9V brownout detector
+    disabletime ; Stop the time clock
+    disconnect ; Don't listen for re-programming
+    gosub normal_speed
 
-    symbol FIRMWARE_VERSION = 19
-    symbol HARDWARE_VERSION = 3
+    symbol FIRMWARE_VERSION = 20
+    symbol HARDWARE_VERSION = 4 ; SMT v0.6 Rev A
 
-    symbol LED = C.1
-    symbol I2C_POWER = C.2
+    symbol EEPROM_POWER = C.2
     symbol SENSOR_POWER = C.4
-    symbol SENSOR_RED = B.1
-    symbol SENSOR_GREEN = B.2
-    symbol SENSOR_BLUE = B.5
-    symbol SENSOR_WHITE = C.0
+    symbol LED1 = C.1
+    symbol LED2 = C.0
+    symbol LED3 = B.5
+    symbol LED4 = B.2
+    symbol LED5 = B.1
     symbol EVENT_BUTTON = pinC.3
 
     ; Button C.3 internal pullup resistor
@@ -72,11 +84,11 @@ init:
 
     ; 63 = max (due to word int maths and avg overflow risk)
     symbol SAMPLES_PER_AVERAGE = 6
-	symbol SECONDS_PER_RECORD = SAMPLES_PER_AVERAGE * 10
+    symbol SECONDS_PER_RECORD = SAMPLES_PER_AVERAGE * 10
 
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
-    symbol FLAG_BLOCKED = %01000000
+    symbol FLAG_TBA = %01000000
     symbol FLAG_BUTTON = %10000000
 
     symbol FIRST_BOOT_PASS_WORD = %1110010110100111
@@ -88,6 +100,7 @@ init:
     symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
     symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
 
+	; Populated by table at address 15 on first boot
     symbol REGISTER_2_5KLUX_RED_WORD = 15
     symbol REGISTER_2_5KLUX_GREEN_WORD = 17
     symbol REGISTER_2_5KLUX_BLUE_WORD = 19
@@ -107,9 +120,7 @@ init:
 
     symbol REGISTER_LIGHT_GOAL_WORD = 47
     symbol REGISTER_DAY_PHASE_WORD = 49
-
     symbol REGISTER_MEMORY_WRAPPED_WORD = 51
-
     symbol REGISTER_BUTTON_LATCHED_WORD = 53
 
     symbol BYTES_PER_RECORD = 6
@@ -120,17 +131,31 @@ init:
     symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
     symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
 
+	symbol TCS34725FN = %01010010
+	symbol TCS34725FN_ID = %10110010
+	symbol TCS34725FN_ATIME = %10100001
+	symbol TCS34725FN_AGAIN = %10101111
+	symbol TCS34725FN_ENABLE = %10100000
+	symbol TCS34725FN_CDATA = %10110100
+	symbol TCS34725FN_RDATA = %10110110
+	symbol TCS34725FN_GDATA = %10111000
+	symbol TCS34725FN_BDATA = %10111010
+	symbol EEPROM_24LC512 = %10100000
+
     symbol red = w0
     symbol green = w1
     symbol blue = w2
-	symbol white = w3
+    symbol white = w3
     symbol red_avg = w4
     symbol green_avg = w5
     symbol blue_avg = w6
     symbol white_avg = w7
-    symbol tmp = w8
-    symbol tmp2 = w9
-
+    symbol tmp_word = w8
+    symbol tmp_low_byte = b16
+    symbol tmp_high_byte = b17
+    symbol tmp2_word = w9
+    symbol tmp2_low_byte = b18
+    symbol tmp2_high_byte = b19
     symbol red_byte = b20
     symbol green_byte = b21
     symbol blue_byte = b22
@@ -140,21 +165,46 @@ init:
     symbol flag = b26
     symbol sample_loop = b27
 
-    ; LED and sensors off
-    low LED
-    low SENSOR_POWER
-
-	; First boot check
-    read REGISTER_FIRST_BOOT_PASS_WORD, word tmp
-    if tmp != FIRST_BOOT_PASS_WORD then
+    ; First boot check
+    read REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
+    if tmp_word != FIRST_BOOT_PASS_WORD then
         gosub first_boot_init
-        gosub default_light_calibration
-	endif
+    endif
+
+    ; Enable TCS34725FN light sensor
+    high SENSOR_POWER
+
+    ; TCS34725FN I2C address 0x29, %00101001, use 7bitaddress + r/w bit...
+    hi2csetup i2cmaster, TCS34725FN, i2cfast, i2cbyte
+
+    ; Check sensor part ID 0x44 (note all register addresses need %101xxxxx padding)
+    hi2cin TCS34725FN_ID, (tmp_low_byte)
+    sertxd("TCS34725FN ID: ", #tmp_low_byte, 13)
+
+    ; ATIME - Set integration time
+    ; 0xFF = 2.4ms - 1 cycle (1024 counts)
+    ; 0xF6 = 24ms  - 10 cycles (counts 10240)
+    ; 0xEB = 50ms  - 20 cycles (counts 20480)
+    ; 0xDF = 77ms  - 32 cycles <<--- 33792 = 50k - 55k lux
+    ; 0xD5 = 101ms - 42 cycles (counts 43008)
+    ; 0xC0 = 154ms - 64 cycles
+    ; 0x80 = 308ms - 128 cycles
+    ; 0x00 = 700ms - 256 cycles (counts 65535 ??)
+    hi2cout TCS34725FN_ATIME, (0xDF)
+    pause 3
+
+    ; AGAIN - set gain for sensor
+    ; 0x00=none
+    ; 0x01=2x
+    ; 0x02=16x
+    ; 0x03=60x
+    hi2cout TCS34725FN_AGAIN, (0x00)
+    pause 3
 
     ; Keep a count of device reboots
-    read REGISTER_REBOOT_COUNT_WORD, word tmp
-    tmp = tmp + 1
-    write REGISTER_REBOOT_COUNT_WORD, word tmp
+    read REGISTER_REBOOT_COUNT_WORD, word tmp_word
+    tmp_word = tmp_word + 1
+    write REGISTER_REBOOT_COUNT_WORD, word tmp_word
 
     gosub flash_led
 
@@ -196,70 +246,70 @@ main:
     white_avg = white_avg / SAMPLES_PER_AVERAGE
 
     ; Accumulate light for goal target
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    read REGISTER_5KLUX_WHITE_WORD, word tmp2
-    if white_avg >= tmp and white_avg < tmp2 then
-        tmp2 = tmp2 - tmp ; 5K - 2.5K calibration delta
-        tmp2 = 500 / tmp2 ; scale factor for one sensor unit
-        tmp = white_avg - tmp * tmp2 + 500; goal points between 500 and 1,000
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
+    read REGISTER_5KLUX_WHITE_WORD, word tmp2_word
+    if white_avg >= tmp_word and white_avg < tmp2_word then
+        tmp2_word = tmp2_word - tmp_word ; 5K - 2.5K calibration delta
+        tmp2_word = 500 / tmp2_word ; scale factor for one sensor unit
+        tmp_word = white_avg - tmp_word * tmp2_word + 500; goal points between 500 and 1,000
         goto goal_update
     endif
 
-    read REGISTER_10KLUX_WHITE_WORD, word tmp
-    if white_avg >= tmp2 and white_avg < tmp then
-        tmp = tmp - tmp2 ; 10K - 5K calibration delta
-        tmp = 1000 / tmp ; scale factor for one sensor unit
-        tmp = white_avg - tmp2 * tmp + 1000; goal points between 1,000 and 2,000
+    read REGISTER_10KLUX_WHITE_WORD, word tmp_word
+    if white_avg >= tmp2_word and white_avg < tmp_word then
+        tmp_word = tmp_word - tmp2_word ; 10K - 5K calibration delta
+        tmp_word = 1000 / tmp_word ; scale factor for one sensor unit
+        tmp_word = white_avg - tmp2_word * tmp_word + 1000; goal points between 1,000 and 2,000
         goto goal_update
     endif
 
-    if white_avg >= tmp then
-        tmp = 2000 ; maximum 2,000 points per min
+    if white_avg >= tmp_word then
+        tmp_word = 2000 ; maximum 2,000 points per min
         goto goal_update
     endif
 
     goto skip_goal_update
 
     goal_update:
-    read REGISTER_LIGHT_GOAL_WORD, word tmp2
-    if tmp2 < 60000 then
-        tmp2 = tmp2 + tmp
+    read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
+    if tmp2_word < 60000 then
+        tmp2_word = tmp2_word + tmp_word
     else
-        tmp2 = 60000
+        tmp2_word = 60000
     endif
-    write REGISTER_LIGHT_GOAL_WORD, word tmp2
+    write REGISTER_LIGHT_GOAL_WORD, word tmp2_word
 
     skip_goal_update:
 
     ; Keep track of day phase cycle
-    read REGISTER_DAY_PHASE_WORD, word tmp
-    tmp = tmp + 1
-    if tmp > 1440 then
+    read REGISTER_DAY_PHASE_WORD, word tmp_word
+    tmp_word = tmp_word + 1
+    if tmp_word > 1440 then
         ; Reset goal and counter cycle every 1440 min
-        tmp = 0
-        write REGISTER_LIGHT_GOAL_WORD, word tmp
+        write REGISTER_LIGHT_GOAL_WORD, 0, 0
+        tmp_word = 0
     endif
-    write REGISTER_DAY_PHASE_WORD, word tmp
+    write REGISTER_DAY_PHASE_WORD, word tmp_word
 
     ; Prepair to write data to eprom
-    read REGISTER_LAST_SAVE_WORD, word tmp
+    read REGISTER_LAST_SAVE_WORD, word tmp_word
 
     ; Store least significant bytes
     red_byte = red_avg     & %11111111
-    hi2cout tmp, (red_byte)
-	tmp = tmp + 1
+    hi2cout tmp_word, (red_byte)
+    tmp_word = tmp_word + 1
 
     green_byte = green_avg & %11111111
-    hi2cout tmp, (green_byte)
-	tmp = tmp + 1
+    hi2cout tmp_word, (green_byte)
+    tmp_word = tmp_word + 1
 
     blue_byte = blue_avg   & %11111111
-    hi2cout tmp, (blue_byte)
-	tmp = tmp + 1
+    hi2cout tmp_word, (blue_byte)
+    tmp_word = tmp_word + 1
 
     white_byte = white_avg & %11111111
-    hi2cout tmp, (white_byte)
-	tmp = tmp + 1
+    hi2cout tmp_word, (white_byte)
+    tmp_word = tmp_word + 1
 
     ; Fill extra_byte with 9th and 10th bits of each RGBT
     extra_byte = red_avg   & %1100000000 / 256
@@ -267,64 +317,126 @@ main:
     extra_byte = blue_avg  & %1100000000 / 16 + extra_byte
     extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
-    hi2cout tmp, (extra_byte)
-	tmp = tmp + 1
+    hi2cout tmp_word, (extra_byte)
+    tmp_word = tmp_word + 1
 
-    hi2cout tmp, (flag)
-	tmp = tmp + 1
+    hi2cout tmp_word, (flag)
+    tmp_word = tmp_word + 1
 
     flag = FLAG_OK ; Clear any flag states
 
     ; Increment and write current position to micro eprom
-	if tmp >= LAST_VALID_RECORD then
-        tmp = 0
-        write REGISTER_LAST_SAVE_WORD, word tmp
+    if tmp_word >= LAST_VALID_RECORD then
+        write REGISTER_LAST_SAVE_WORD, 0, 0
 
         ; Keep track of memory wrapps
-        read REGISTER_MEMORY_WRAPPED_WORD, word tmp
-        tmp = tmp + 1
-        write REGISTER_MEMORY_WRAPPED_WORD, word tmp
+        read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
+        tmp_word = tmp_word + 1
+        write REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
 
     else
-        write REGISTER_LAST_SAVE_WORD, word tmp
+        write REGISTER_LAST_SAVE_WORD, word tmp_word
     endif
 
     goto main
 
 delay_2sec:
     ; Delay for 2 sec without using the low power sleep watchdog timer 
-	; More accurate, avoids intermittent crashes, but uses more power
-    low I2C_POWER
-    setfreq k31
+    ; More accurate, avoids intermittent crashes, but uses more power
+    low EEPROM_POWER
+    gosub low_speed
+    pauseus 1227 ; use mean value for testing
     ;pauseus 1389 ; my daily worn test unit
     ;pauseus 1380 ; white case with green sensor error
     ;pauseus 1344 ; red case in livingroom window
     ;pauseus 1318 ; red case on lamp in livingroom
-    pauseus 1286 ; blue case fridge
+    ;pauseus 1286 ; blue case fridge
     ;pauseus 1484 ; blue case bedroom window
-    setfreq m1
-    high I2C_POWER
+    gosub normal_speed
+    high EEPROM_POWER
     return
 
 read_RGBW_sensors:
-    high SENSOR_POWER
-    readadc10 SENSOR_RED, red
-    readadc10 SENSOR_GREEN, green
-    readadc10 SENSOR_BLUE, blue
-    readadc10 SENSOR_WHITE, white
-    low SENSOR_POWER
+	; Consider powering off and setting up registers each time rather than sleep (2.5-10uA)
+    ; TCS34725FN I2C address 0x29, %00101001, use 7bitaddress + r/w bit...
+	hi2csetup i2cmaster, TCS34725FN, i2cfast, i2cbyte
+
+	; ENABLE - PON power on internal oscillator
+	hi2cout TCS34725FN_ENABLE, (%00000001)
+	pause 4; Min of 2.4ms before RGBC
+
+	; ENABLE - AEN, start RGBC ADC (and leave power ON)
+	hi2cout TCS34725FN_ENABLE, (%00000011)
+	;pause 4
+
+	; Wait ~intergration time before reading (should only need ~77ms for default, or so...)
+	; TODO: Move/refactor this delay to an existing natural delay (e.g. button waits?)
+	; <<<------ FIXME: currently messing up my log timing and stability no doubt...
+	pause 22
+
+	hi2cin TCS34725FN_CDATA, (tmp_low_byte, tmp_high_byte)
+	gosub bit_compress
+    white = tmp_word
+
+	hi2cin TCS34725FN_RDATA, (tmp_low_byte, tmp_high_byte)
+	gosub bit_compress
+    red = tmp_word
+
+	hi2cin TCS34725FN_GDATA, (tmp_low_byte, tmp_high_byte) 
+	gosub bit_compress
+    green = tmp_word
+
+	hi2cin TCS34725FN_BDATA, (tmp_low_byte, tmp_high_byte)
+	gosub bit_compress
+    blue = tmp_word
+
+	; Disable TCS34725FN internal oscillator and RGB ADC (low power sleep)
+	hi2cout TCS34725FN_ENABLE, (%00000000)
+    ;sertxd("W", #white, ", R", #red, ", G", #green, ", B", #blue, 13)
     return
+
+bit_compress:
+	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
+	if tmp_word < %0000000001000000 then
+		return
+	elseif tmp_word < %0000000010000000 then
+		tmp_word = tmp_word / 2 + %0001000000
+	elseif tmp_word < %0000000100000000 then
+		tmp_word = tmp_word / 4 + %0010000000
+	elseif tmp_word < %0000001000000000 then
+		tmp_word = tmp_word / 8 + %0011000000
+	elseif tmp_word < %0000010000000000 then
+		tmp_word = tmp_word / 16 + %0100000000
+	elseif tmp_word < %0000100000000000 then
+		tmp_word = tmp_word / 32 + %0101000000
+	elseif tmp_word < %0001000000000000 then
+		tmp_word = tmp_word / 64 + %0110000000
+	elseif tmp_word < %0010000000000000 then
+		tmp_word = tmp_word / 128 + %0111000000
+	elseif tmp_word < %0100000000000000 then
+		tmp_word = tmp_word / 256 + %1000000000
+	elseif tmp_word < %1000000000000000 then
+		tmp_word = tmp_word / 512 + %1001000000
+	else
+		tmp_word = tmp_word / 1024 + %1010000000
+	endif
+	; Unused patterns available for extra resolution/scale
+	; %1011xxxxxx
+	; %1100xxxxxx
+	; %1101xxxxxx
+	; %1110xxxxxx
+	; %1111xxxxxx
+	return
 
 check_user_button:
     if EVENT_BUTTON = 0 then
-		read REGISTER_BUTTON_LATCHED_WORD, word tmp
-		if tmp > 3 then
+		; Check for button latch
+        read REGISTER_BUTTON_LATCHED_WORD, word tmp_word
+        if tmp_word > 3 then
             return
         endif
-        tmp = tmp + 1
-        write REGISTER_BUTTON_LATCHED_WORD, word tmp
-
-        gosub med_speed
+        tmp_word = tmp_word + 1
+        write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
 
@@ -337,89 +449,82 @@ check_user_button:
         ; Prevent program upload (saves power)
         disconnect
 
-        gosub high_speed
-        read REGISTER_LIGHT_GOAL_WORD, word tmp
-        if tmp >= 60000 then
-            ; Minimim recommended light goal reached
-            gosub pulse_led
-            gosub pulse_led
-            gosub pulse_led
-            gosub pulse_led
+		; Lead into bargraph
+		gosub flash_led
 
-        elseif tmp >= 40000 then
-            ; Two thirds of light goal reached
-            gosub pulse_led
-            gosub pulse_led
-            gosub pulse_led
+		; Check if illumination is currently bright enough to count
+		read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
+		if white >= tmp_word then
+			tmp2_high_byte = 16
+		else
+			tmp2_high_byte = 48
+		endif
 
-        elseif tmp >= 20000 then
-            ; Third of light goal reached
-            gosub pulse_led
-            gosub pulse_led
+		; Display bar graph for daily goal progress
+        read REGISTER_LIGHT_GOAL_WORD, word tmp_word
+        for tmp2_low_byte = 0 to 6
+        	high LED5
+        	if tmp_word >= 12000 then
+				high LED4
+			endif
+        	if tmp_word >= 24000 then
+				high LED3
+			endif
+        	if tmp_word >= 36000 then
+				high LED2
+			endif
+        	if tmp_word >= 48000 then
+				high LED1
+			endif
+			pause tmp2_high_byte
 
-        else
-            ; Less than a third of light goal
-            gosub pulse_led
-        endif
-        gosub low_speed
+   	     if tmp_word < 12000 then
+				low LED5
+			endif
+    	    if tmp_word < 24000 then
+				low LED4
+			endif
+    	    if tmp_word < 36000 then
+				low LED3
+			endif
+    	    if tmp_word < 48000 then
+				low LED2
+			endif
+    	    if tmp_word < 60000 then
+				low LED1
+			endif
+        	pause tmp2_high_byte
+
+        next tmp2_low_byte
+		low LED1, LED2, LED3, LED4, LED5
+
     else
-        tmp = 0
-        write REGISTER_BUTTON_LATCHED_WORD, word tmp
+        write REGISTER_BUTTON_LATCHED_WORD, 0, 0
     endif
 
     return
 
 flash_led:
-    ; Simple on/off flash (used on reboot)
-    high LED
-    nap 0
-    low LED
-    nap 2 ; 72ms
-    return
-
-pulse_led:
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    if white >= tmp then
-        ; Light is bright enough to count towards goal
-        gosub fast_pulse_led
-    else
-        gosub slow_pulse_led
-    endif
-    return
-
-slow_pulse_led:
-    ; Fade up
-    for tmp = 0 to 150 step 10
-        gosub pulse_timing
-    next tmp
-    ; Fade down
-	for tmp = 150 to 0 step -10
-        gosub pulse_timing
-    next tmp
-    return
-
-fast_pulse_led:
-    ; Fade up
-    for tmp = 0 to 150 step 25
-        gosub pulse_timing
-    next tmp
-    ; Fade down
-	for tmp = 150 to 0 step -25
-        gosub pulse_timing
-    next tmp
-    return
-
-pulse_timing:
-    high LED
-    tmp2 = tmp * tmp
-    pauseus tmp2
-    low LED
-    tmp2 = 150 - tmp
-    tmp2 = tmp2 * tmp2
-    pauseus tmp2
+    ; Simple LED sequence flash
+	high LED5
+	pause 8
+	low LED5
+	high LED4
+	pause 8
+	low LED4
+	high LED3
+	pause 8
+	low LED3
+	high LED2
+	pause 8
+	low LED2
+	high LED1
+	pause 8
+	low LED1
     return
 
 check_serial_comms:
+    gosub comms_speed
     sertxd("Hello?")
     serrxd [150, serial_checked], ser_in_byte
 
@@ -462,6 +567,7 @@ check_serial_comms:
     endselect
 
     serial_checked:
+    gosub normal_speed
     return
 
 calibrate_2_5Klux:
@@ -493,59 +599,59 @@ calibrate_20Klux:
     return
 
 header_block:
-    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-    sertxd("ID:", #tmp)
-    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp
-    sertxd(",", #tmp, ";")
-	read REGISTER_HARDWARE_VERSION_BYTE, tmp
-    sertxd("HW:", #tmp, ";")
+    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp_word
+    sertxd("ID:", #tmp_word)
+    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp_word
+    sertxd(",", #tmp_word, ";")
+    read REGISTER_HARDWARE_VERSION_BYTE, tmp_word
+    sertxd("HW:", #tmp_word, ";")
     sertxd("FW:", #FIRMWARE_VERSION, ";")
-    read REGISTER_REBOOT_COUNT_WORD, word tmp
-    sertxd("Boots:", #tmp, ";")
-    read REGISTER_LAST_SAVE_WORD, word tmp
-    sertxd("Pointer:", #tmp, ";")
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
-    sertxd("Wrap:", #tmp, ";")
+    read REGISTER_REBOOT_COUNT_WORD, word tmp_word
+    sertxd("Boots:", #tmp_word, ";")
+    read REGISTER_LAST_SAVE_WORD, word tmp_word
+    sertxd("Pointer:", #tmp_word, ";")
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
+    sertxd("Wrap:", #tmp_word, ";")
     sertxd("Period:", #SECONDS_PER_RECORD, ";")
-    read REGISTER_2_5KLUX_RED_WORD, word tmp
-    sertxd("2.5KluxR:", #tmp, ";")
-    read REGISTER_2_5KLUX_GREEN_WORD, word tmp
-    sertxd("2.5KluxG:", #tmp, ";")
-    read REGISTER_2_5KLUX_BLUE_WORD, word tmp
-    sertxd("2.5KluxB:", #tmp, ";")
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    sertxd("2.5KluxW:", #tmp, ";")
-    read REGISTER_5KLUX_RED_WORD, word tmp
-    sertxd("5KluxR:", #tmp, ";")
-    read REGISTER_5KLUX_GREEN_WORD, word tmp
-    sertxd("5KluxG:", #tmp, ";")
-    read REGISTER_5KLUX_BLUE_WORD, word tmp
-    sertxd("5KluxB:", #tmp, ";")
-    read REGISTER_5KLUX_WHITE_WORD, word tmp
-    sertxd("5KluxW:", #tmp, ";")
-    read REGISTER_10KLUX_RED_WORD, word tmp
-    sertxd("10KluxR:", #tmp, ";")
-    read REGISTER_10KLUX_GREEN_WORD, word tmp
-    sertxd("10KluxG:", #tmp, ";")
-    read REGISTER_10KLUX_BLUE_WORD, word tmp
-    sertxd("10KluxB:", #tmp, ";")
-    read REGISTER_10KLUX_WHITE_WORD, word tmp
-    sertxd("10KluxW:", #tmp, ";")
-    read REGISTER_20KLUX_RED_WORD, word tmp
-    sertxd("20KluxR:", #tmp, ";")
-    read REGISTER_20KLUX_GREEN_WORD, word tmp
-    sertxd("20KluxG:", #tmp, ";")
-    read REGISTER_20KLUX_BLUE_WORD, word tmp
-    sertxd("20KluxB:", #tmp, ";")
-    read REGISTER_20KLUX_WHITE_WORD, word tmp
-    sertxd("20KluxW:", #tmp, ";")
-    read REGISTER_LIGHT_GOAL_WORD, word tmp
-    sertxd("Goal:", #tmp, ";")
-    read REGISTER_DAY_PHASE_WORD, word tmp
-    sertxd("Phase:", #tmp, ";")
-    calibadc10 tmp
-    tmp = 52378 / tmp * 2
-    sertxd("Batt:", #tmp, "0mV", ";")
+    read REGISTER_2_5KLUX_RED_WORD, word tmp_word
+    sertxd("2.5KluxR:", #tmp_word, ";")
+    read REGISTER_2_5KLUX_GREEN_WORD, word tmp_word
+    sertxd("2.5KluxG:", #tmp_word, ";")
+    read REGISTER_2_5KLUX_BLUE_WORD, word tmp_word
+    sertxd("2.5KluxB:", #tmp_word, ";")
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
+    sertxd("2.5KluxW:", #tmp_word, ";")
+    read REGISTER_5KLUX_RED_WORD, word tmp_word
+    sertxd("5KluxR:", #tmp_word, ";")
+    read REGISTER_5KLUX_GREEN_WORD, word tmp_word
+    sertxd("5KluxG:", #tmp_word, ";")
+    read REGISTER_5KLUX_BLUE_WORD, word tmp_word
+    sertxd("5KluxB:", #tmp_word, ";")
+    read REGISTER_5KLUX_WHITE_WORD, word tmp_word
+    sertxd("5KluxW:", #tmp_word, ";")
+    read REGISTER_10KLUX_RED_WORD, word tmp_word
+    sertxd("10KluxR:", #tmp_word, ";")
+    read REGISTER_10KLUX_GREEN_WORD, word tmp_word
+    sertxd("10KluxG:", #tmp_word, ";")
+    read REGISTER_10KLUX_BLUE_WORD, word tmp_word
+    sertxd("10KluxB:", #tmp_word, ";")
+    read REGISTER_10KLUX_WHITE_WORD, word tmp_word
+    sertxd("10KluxW:", #tmp_word, ";")
+    read REGISTER_20KLUX_RED_WORD, word tmp_word
+    sertxd("20KluxR:", #tmp_word, ";")
+    read REGISTER_20KLUX_GREEN_WORD, word tmp_word
+    sertxd("20KluxG:", #tmp_word, ";")
+    read REGISTER_20KLUX_BLUE_WORD, word tmp_word
+    sertxd("20KluxB:", #tmp_word, ";")
+    read REGISTER_20KLUX_WHITE_WORD, word tmp_word
+    sertxd("20KluxW:", #tmp_word, ";")
+    read REGISTER_LIGHT_GOAL_WORD, word tmp_word
+    sertxd("Goal:", #tmp_word, ";")
+    read REGISTER_DAY_PHASE_WORD, word tmp_word
+    sertxd("Phase:", #tmp_word, ";")
+    calibadc10 tmp_word
+    tmp_word = 52378 / tmp_word * 2
+    sertxd("Batt:", #tmp_word, "0mV", ";")
     sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
     sertxd("head_eof")
     return
@@ -553,8 +659,8 @@ header_block:
 dump_data:
     ; Output data oldest to newest
     gosub header_block
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp
-    if tmp > 0 then
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
+    if tmp_word > 0 then
         ; Dump end block of memory first if memory has wrapped one or more times
         gosub dump_from_index_to_end
     endif
@@ -563,41 +669,42 @@ dump_data:
     return
 
 dump_up_to_index:
-    read REGISTER_LAST_SAVE_WORD, word tmp
-    if tmp != 0 then
-	    tmp = tmp - BYTES_PER_RECORD - 1
+    read REGISTER_LAST_SAVE_WORD, word tmp_word
+    if tmp_word != 0 then
+        tmp_word = tmp_word - BYTES_PER_RECORD - 1
     endif
-    for tmp2 = 0 to tmp step 6
+    for tmp2_word = 0 to tmp_word step 6
         ; ser_in_byte used instead of flag to preserve its value
-        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
+        hi2cin tmp2_word, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
         sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-    next tmp2
+    next tmp2_word
     return
 
 dump_from_index_to_end:
-    read REGISTER_LAST_SAVE_WORD, word tmp
-    if tmp != 0 then
-	    tmp = tmp - BYTES_PER_RECORD
+    read REGISTER_LAST_SAVE_WORD, word tmp_word
+    if tmp_word != 0 then
+        tmp_word = tmp_word - BYTES_PER_RECORD
     endif
-    for tmp2 = tmp to LAST_VALID_BYTE step 6
+    for tmp2_word = tmp_word to LAST_VALID_BYTE step 6
         ; ser_in_byte used instead of flag to preserve its value
-        hi2cin tmp2, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
+        hi2cin tmp2_word, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
         sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-    next tmp2
+    next tmp2_word
     return
 
 reset_pointer:
-    tmp = 0 ; reset pointers back to start of mem
-    write REGISTER_LAST_SAVE_WORD, word tmp
-    write REGISTER_MEMORY_WRAPPED_WORD, word tmp
+    ; Reset pointers back to start of mem
+    write REGISTER_LAST_SAVE_WORD, 0, 0
+    write REGISTER_MEMORY_WRAPPED_WORD, 0, 0
     return
 
 reset_reboot_counter:
-    tmp = 0
-    write REGISTER_REBOOT_COUNT_WORD, word tmp ; reset reboot counter back to 0
+    ; Reset reboot counter back to 0
+    write REGISTER_REBOOT_COUNT_WORD, 0, 0 
     return
 
 first_boot_init:
+    gosub default_light_calibration
     gosub reset_pointer
     gosub reset_reboot_counter
     gosub zero_light_goal
@@ -606,85 +713,53 @@ first_boot_init:
 
     ; Generate unique hardware id (seed from sensor and battery readings)
     gosub read_RGBW_sensors
-    calibadc10 tmp
-    tmp = red * green * blue * white * tmp
-    random tmp
-    write REGISTER_UNIQUE_HW_ID_WORD1, word tmp
-    tmp = red * green * blue * white * tmp
-    random tmp
-    write REGISTER_UNIQUE_HW_ID_WORD2, word tmp
+    calibadc10 tmp_word
+    tmp_word = red * green * blue * white * tmp_word
+    random tmp_word
+    write REGISTER_UNIQUE_HW_ID_WORD1, word tmp_word
+    tmp_word = red * green * blue * white * tmp_word
+    random tmp_word
+    write REGISTER_UNIQUE_HW_ID_WORD2, word tmp_word
 
     ; Mark first boot as passed
-    tmp = FIRST_BOOT_PASS_WORD
-    write REGISTER_FIRST_BOOT_PASS_WORD, word tmp
-
+    tmp_word = FIRST_BOOT_PASS_WORD
+    write REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
     return
 
 zero_light_goal:
-    tmp = 0
-    write REGISTER_LIGHT_GOAL_WORD, word tmp
+    write REGISTER_LIGHT_GOAL_WORD, 0, 0
     return
 
 zero_day_phase:
-    tmp = 0
-    write REGISTER_DAY_PHASE_WORD, word tmp
+    write REGISTER_DAY_PHASE_WORD, 0, 0
     return
 
 half_day_phase:
-    tmp = 720
-    write REGISTER_DAY_PHASE_WORD, word tmp
+    write REGISTER_DAY_PHASE_WORD, 0xD0, 0x02 ; 720
     return
 
 default_light_calibration:
-    ; Default calibration using full spectrum white light measured with
-    ; device inside case, behind RGB & clear light gels, and at room temp.
-    tmp = 579
-    write REGISTER_2_5KLUX_RED_WORD, word tmp
-    tmp = 468
-    write REGISTER_2_5KLUX_GREEN_WORD, word tmp
-    tmp = 435
-    write REGISTER_2_5KLUX_BLUE_WORD, word tmp
-    tmp = 794
-    write REGISTER_2_5KLUX_WHITE_WORD, word tmp
-    tmp = 662
-    write REGISTER_5KLUX_RED_WORD, word tmp
-    tmp = 566
-    write REGISTER_5KLUX_GREEN_WORD, word tmp
-    tmp = 529
-    write REGISTER_5KLUX_BLUE_WORD, word tmp
-    tmp = 838
-    write REGISTER_5KLUX_WHITE_WORD, word tmp
-    tmp = 719
-    write REGISTER_10KLUX_RED_WORD, word tmp
-    tmp = 633
-    write REGISTER_10KLUX_GREEN_WORD, word tmp
-    tmp = 608
-    write REGISTER_10KLUX_BLUE_WORD, word tmp
-    tmp = 862
-    write REGISTER_10KLUX_WHITE_WORD, word tmp
-    tmp = 789
-    write REGISTER_20KLUX_RED_WORD, word tmp
-    tmp = 733
-    write REGISTER_20KLUX_GREEN_WORD, word tmp
-    tmp = 698
-    write REGISTER_20KLUX_BLUE_WORD, word tmp
-    tmp = 887
-    write REGISTER_20KLUX_WHITE_WORD, word tmp
+    ; Default calibration using full spectrum white light measured at room temp.
+    ; Copies 32 table bytes into matching memory data address 15 onwards
+	for tmp_low_byte = 15 to 47
+		readtable tmp_low_byte, tmp_high_byte
+		write tmp_low_byte, tmp_high_byte
+	next tmp_low_byte
     return
 
-high_speed:
-	; User LED feedback
-    setfreq m32 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    return
-
-med_speed:
-	; 19200 comms to save power during sync
+comms_speed:
+    ; 19200 comms to save power during sync
     setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, %10100000, i2cfast_16, i2cword
+    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast_16, i2cword
+    return
+
+normal_speed:
+    ; Sensor read and average i2c write loop
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast, i2cword
     return
 
 low_speed:
-    ; Sensor read and average i2c write loop
-    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, %10100000, i2cfast, i2cword
+    ; Simulate low power sleep
+    setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     return
