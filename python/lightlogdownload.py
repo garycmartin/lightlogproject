@@ -330,7 +330,7 @@ def append_data_to_file(data_rows, args, status_dict):
 
         f = open(args.file, "a")
         if data_rows[0][4] > last_log_end:
-            print >> sys.stderr, "WARNING: No overlap with existing log, all downloaded data is newer (there will be a gap in the time series)."
+            print >> sys.stderr, "WARNING: %dmin gap between this and existing log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
             for row in data_rows:
                 f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
                 count_rows += 1
