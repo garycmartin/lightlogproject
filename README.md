@@ -1,4 +1,4 @@
 lightlogproject
 ===============
 
-Wearable, ambient light tracking.
+Wearable, open source, ambient colour light tracker.
