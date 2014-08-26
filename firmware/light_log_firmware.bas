@@ -195,7 +195,7 @@ init:
 
     ; AGAIN - set gain for sensor
     ; 0x00=none
-    ; 0x01=2x
+    ; 0x01=2x it's shown as 4x in the data sheet...
     ; 0x02=16x
     ; 0x03=60x
     hi2cout TCS34725FN_AGAIN, (0x00)
