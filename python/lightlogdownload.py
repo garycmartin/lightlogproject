@@ -82,7 +82,7 @@ def get_args():
                        choices=['a', 'e', 'f', 'l', 'm', 'n', 'z'])
     group.add_argument("--cal",
                        help="calibrate hardware to known lux light sources",
-                       choices=['2.5k', '5k', '10k', '20k'])
+                       choices=['2.5k', '5k', '10k'])
 
     if parser.parse_args().version:
         print >> sys.stderr, "Version", VERSION
@@ -135,10 +135,9 @@ def parse_status_header(status):
     status_dict['Batt'] = int(status_dict['Batt'][:-2])
 
     # Convert relavent strings to int
-    for i in ('Goal', 'FW', '20KluxG', '20KluxB', '10KluxB', '20KluxW',
-              '20KluxR', '5KluxB', '5KluxG', '5KluxR', '5KluxW', 'Phase',
-              '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', '10KluxG',
-              'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR'):
+    for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW',
+              'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR',
+              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR'):
         if i in status_dict:
             status_dict[i] = int(status_dict[i])
     return status_dict
@@ -148,10 +147,9 @@ def convert_to_lux(red, green, blue, white, status_dict):
     Use pre-fitted average lux test data function to convert to lux.
 
     Ideally this function should use the current devices calibration data
-    status_dict['2.5KluxW'], status_dict['5KluxW'], status_dict['10KluxW']
-    status_dict['20KluxW'], etc to convert sensor data to lux. Currently
-    this function has been pre-fitted to average calibration data from
-    multiple devices.
+    status_dict['2.5KluxW'], status_dict['5KluxW'], status_dict['10KluxW'],
+    etc to convert sensor data to lux. Currently this function has been
+    pre-fitted to average calibration data from multiple devices.
         RGB values are scaled relative to the clear sensor lux value as an
     estimate for how much each section of the spectra may map into the
     total lux value (lux is a measurement of the total visible spectrum EMF).
@@ -258,8 +256,6 @@ def download_data_from_lightlog(ser, args):
                         ser.write('i') # i = calibrate to 5K lux source!!
                     elif args.cal == '10k':
                         ser.write('j') # j = calibrate to 10K lux source!!
-                    elif args.cal == '20k':
-                        ser.write('k') # k = calibrate to 20K lux source!!
                     elif args.cmd == 'l':
                         ser.write('l') # l = zero light goal
                     elif args.cmd == 'm':
