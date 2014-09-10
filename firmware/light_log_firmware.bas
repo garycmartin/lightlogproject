@@ -610,59 +610,51 @@ calibrate_10Klux:
     return
 
 header_block:
-    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp_word
-    sertxd("ID:", #tmp_word)
-    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp_word
-    sertxd(",", #tmp_word, ";")
-    read REGISTER_HARDWARE_VERSION_BYTE, tmp_word
-    sertxd("HW:", #tmp_word, ";")
+    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp2_word
+    sertxd("ID:", #tmp2_word)
+    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp2_word
+    sertxd(",", #tmp2_word, ";")
+    read REGISTER_HARDWARE_VERSION_BYTE, tmp2_word
+    sertxd("HW:", #tmp2_word, ";")
     sertxd("FW:", #FIRMWARE_VERSION, ";")
-    read REGISTER_REBOOT_COUNT_WORD, word tmp_word
-    sertxd("Boots:", #tmp_word, ";")
-    read REGISTER_LAST_SAVE_WORD, word tmp_word
-    sertxd("Pointer:", #tmp_word, ";")
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
-    sertxd("Wrap:", #tmp_word, ";")
+    read REGISTER_REBOOT_COUNT_WORD, word tmp2_word
+    sertxd("Boots:", #tmp2_word, ";")
+    read REGISTER_LAST_SAVE_WORD, word tmp2_word
+    sertxd("Pointer:", #tmp2_word, ";")
+    read REGISTER_MEMORY_WRAPPED_WORD, word tmp2_word
+    sertxd("Wrap:", #tmp2_word, ";")
     sertxd("Period:", #SECONDS_PER_RECORD, ";")
-    read REGISTER_2_5KLUX_RED_WORD, word tmp_word
-    sertxd("2.5KluxR:", #tmp_word, ";")
-    read REGISTER_2_5KLUX_GREEN_WORD, word tmp_word
-    sertxd("2.5KluxG:", #tmp_word, ";")
-    read REGISTER_2_5KLUX_BLUE_WORD, word tmp_word
-    sertxd("2.5KluxB:", #tmp_word, ";")
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
-    sertxd("2.5KluxW:", #tmp_word, ";")
-    read REGISTER_5KLUX_RED_WORD, word tmp_word
-    sertxd("5KluxR:", #tmp_word, ";")
-    read REGISTER_5KLUX_GREEN_WORD, word tmp_word
-    sertxd("5KluxG:", #tmp_word, ";")
-    read REGISTER_5KLUX_BLUE_WORD, word tmp_word
-    sertxd("5KluxB:", #tmp_word, ";")
-    read REGISTER_5KLUX_WHITE_WORD, word tmp_word
-    sertxd("5KluxW:", #tmp_word, ";")
-    read REGISTER_10KLUX_RED_WORD, word tmp_word
-    sertxd("10KluxR:", #tmp_word, ";")
-    read REGISTER_10KLUX_GREEN_WORD, word tmp_word
-    sertxd("10KluxG:", #tmp_word, ";")
-    read REGISTER_10KLUX_BLUE_WORD, word tmp_word
-    sertxd("10KluxB:", #tmp_word, ";")
-    read REGISTER_10KLUX_WHITE_WORD, word tmp_word
-    sertxd("10KluxW:", #tmp_word, ";")
-    read REGISTER_20KLUX_RED_WORD, word tmp_word
-    sertxd("20KluxR:", #tmp_word, ";")
-    read REGISTER_20KLUX_GREEN_WORD, word tmp_word
-    sertxd("20KluxG:", #tmp_word, ";")
-    read REGISTER_20KLUX_BLUE_WORD, word tmp_word
-    sertxd("20KluxB:", #tmp_word, ";")
-    read REGISTER_20KLUX_WHITE_WORD, word tmp_word
-    sertxd("20KluxW:", #tmp_word, ";")
-    read REGISTER_LIGHT_GOAL_WORD, word tmp_word
-    sertxd("Goal:", #tmp_word, ";")
-    read REGISTER_DAY_PHASE_WORD, word tmp_word
-    sertxd("Phase:", #tmp_word, ";")
-    calibadc10 tmp_word
-    tmp_word = 52378 / tmp_word * 2
-    sertxd("Batt:", #tmp_word, "0mV", ";")
+    read REGISTER_2_5KLUX_RED_WORD, word tmp2_word
+    sertxd("2.5KluxR:", #tmp2_word, ";")
+    read REGISTER_2_5KLUX_GREEN_WORD, word tmp2_word
+    sertxd("2.5KluxG:", #tmp2_word, ";")
+    read REGISTER_2_5KLUX_BLUE_WORD, word tmp2_word
+    sertxd("2.5KluxB:", #tmp2_word, ";")
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp2_word
+    sertxd("2.5KluxW:", #tmp2_word, ";")
+    read REGISTER_5KLUX_RED_WORD, word tmp2_word
+    sertxd("5KluxR:", #tmp2_word, ";")
+    read REGISTER_5KLUX_GREEN_WORD, word tmp2_word
+    sertxd("5KluxG:", #tmp2_word, ";")
+    read REGISTER_5KLUX_BLUE_WORD, word tmp2_word
+    sertxd("5KluxB:", #tmp2_word, ";")
+    read REGISTER_5KLUX_WHITE_WORD, word tmp2_word
+    sertxd("5KluxW:", #tmp2_word, ";")
+    read REGISTER_10KLUX_RED_WORD, word tmp2_word
+    sertxd("10KluxR:", #tmp2_word, ";")
+    read REGISTER_10KLUX_GREEN_WORD, word tmp2_word
+    sertxd("10KluxG:", #tmp2_word, ";")
+    read REGISTER_10KLUX_BLUE_WORD, word tmp2_word
+    sertxd("10KluxB:", #tmp2_word, ";")
+    read REGISTER_10KLUX_WHITE_WORD, word tmp2_word
+    sertxd("10KluxW:", #tmp2_word, ";")
+    read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
+    sertxd("Goal:", #tmp2_word, ";")
+    read REGISTER_DAY_PHASE_WORD, word tmp2_word
+    sertxd("Phase:", #tmp2_word, ";")
+    calibadc10 tmp2_word
+    tmp2_word = 52378 / tmp2_word * 2
+    sertxd("Batt:", #tmp2_word, "0mV", ";")
     sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
     sertxd("head_eof")
     return
