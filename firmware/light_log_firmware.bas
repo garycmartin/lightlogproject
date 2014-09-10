@@ -165,36 +165,6 @@ init:
         gosub first_boot_init
     endif
 
-    ; Enable TCS34725FN light sensor
-    high SENSOR_POWER
-
-    ; TCS34725FN I2C address 0x29, %00101001, use 7bitaddress + r/w bit...
-    hi2csetup i2cmaster, TCS34725FN, i2cfast, i2cbyte
-
-    ; Check sensor part ID 0x44 (note all register addresses need %101xxxxx padding)
-    hi2cin TCS34725FN_ID, (tmp_low_byte)
-    sertxd("TCS34725FN ID: ", #tmp_low_byte, 13)
-
-    ; ATIME - Set integration time
-    ; 0xFF = 2.4ms - 1 cycle (1024 counts)
-    ; 0xF6 = 24ms  - 10 cycles (counts 10240)
-    ; 0xEB = 50ms  - 20 cycles (counts 20480)
-    ; 0xDF = 77ms  - 32 cycles <<--- 33792 = 50k - 55k lux
-    ; 0xD5 = 101ms - 42 cycles (counts 43008)
-    ; 0xC0 = 154ms - 64 cycles
-    ; 0x80 = 308ms - 128 cycles
-    ; 0x00 = 700ms - 256 cycles (counts 65535 ??)
-    hi2cout TCS34725FN_ATIME, (0xDF)
-    pause 3
-
-    ; AGAIN - set gain for sensor
-    ; 0x00=none
-    ; 0x01=2x it's shown as 4x in the data sheet...
-    ; 0x02=16x
-    ; 0x03=60x
-    hi2cout TCS34725FN_AGAIN, (0x00)
-    pause 3
-
     ; Keep a count of device reboots
     read REGISTER_REBOOT_COUNT_WORD, word tmp_word
     tmp_word = tmp_word + 1
@@ -351,24 +321,66 @@ delay_2sec:
     return
 
 read_RGBW_sensors:
-	; Consider powering off and setting up registers each time rather than sleep (2.5-10uA)
+    ; Enable TCS34725FN light sensor
+    high SENSOR_POWER
+
     ; TCS34725FN I2C address 0x29, %00101001, use 7bitaddress + r/w bit...
-	hi2csetup i2cmaster, TCS34725FN, i2cfast, i2cbyte
+    hi2csetup i2cmaster, TCS34725FN, i2cfast, i2cbyte
+
+    ; ATIME - Set integration time
+    ; 0xFF = 2.4ms - 1 cycle (1024 counts == 10 bits) <-- take advantage, quicker, less processing? 
+    ; 0xFE = 4.8ms - 2 cycle (2048 counts == 11 bits)
+    ; 0xFC = 9.6ms - 4 cycle (4096 counts == 12 bits)
+    ; 0xF8 = 19.2ms - 8 cycle (8192 counts == 13 bits)
+    ; 0xF0 = 38.4ms - 16 cycle (16384 counts == 14 bits)
+    ; 0xDF = 77ms  - 32 cycles (33792 counts == 15 bits)
+    ; 0xC0 = 154ms - 64 cycles (65535 counts == 16 bits)
+    ; 0x80 = 308ms - 128 cycles (65535 counts)
+    ; 0x00 = 700ms - 256 cycles (65535 counts)
+    hi2cout TCS34725FN_ATIME, (0xC0)
+    pause 3
+
+    ; AGAIN - set gain for sensor
+    ; 0x00=none
+    ; 0x01=4x
+    ; 0x02=16x
+    ; 0x03=60x
+    hi2cout TCS34725FN_AGAIN, (0x02)
+
+	tmp2_low_byte = 0 ; Flag to indicate overexposed sample
+	too_bright_retry_entry_point:
+
+    pause 3
 
 	; ENABLE - PON power on internal oscillator
 	hi2cout TCS34725FN_ENABLE, (%00000001)
-	pause 4; Min of 2.4ms before RGBC
+	pause 4; Min of 2.4ms before enabling RGBC
 
 	; ENABLE - AEN, start RGBC ADC (and leave power ON)
 	hi2cout TCS34725FN_ENABLE, (%00000011)
-	;pause 4
 
 	; Wait ~intergration time before reading (should only need ~77ms for default, or so...)
 	; TODO: Move/refactor this delay to an existing natural delay (e.g. button waits?)
 	; <<<------ FIXME: currently messing up my log timing and stability no doubt...
-	pause 22
+	pause 44
+
+	; Sleep once integration cycle completes
+	hi2cout TCS34725FN_ENABLE, (%00000001)
 
 	hi2cin TCS34725FN_CDATA, (tmp_low_byte, tmp_high_byte)
+
+	; Check if overexposed
+	if tmp_word = 0xFFFF and tmp2_low_byte = 0 then
+	    ;sertxd(">", #tmp_word, ", ")
+		tmp2_low_byte = 1
+	    hi2cout TCS34725FN_AGAIN, (0x00)
+		goto too_bright_retry_entry_point
+	else
+		; correct timing if first sample was good
+	    ;sertxd("=", #tmp_word, ", ")
+		pause 51
+	endif
+
 	gosub bit_compress
     white = tmp_word
 
@@ -384,41 +396,65 @@ read_RGBW_sensors:
 	gosub bit_compress
     blue = tmp_word
 
-	; Disable TCS34725FN internal oscillator and RGB ADC (low power sleep)
-	hi2cout TCS34725FN_ENABLE, (%00000000)
+    ; Power off TCS34725FN light sensor
+    low SENSOR_POWER
+
     ;sertxd("W", #white, ", R", #red, ", G", #green, ", B", #blue, 13)
     return
 
 bit_compress:
 	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
-	if tmp_word < %0000000001000000 then
-		return
-	elseif tmp_word < %0000000010000000 then
-		tmp_word = tmp_word / 2 + %0001000000
-	elseif tmp_word < %0000000100000000 then
-		tmp_word = tmp_word / 4 + %0010000000
-	elseif tmp_word < %0000001000000000 then
-		tmp_word = tmp_word / 8 + %0011000000
-	elseif tmp_word < %0000010000000000 then
-		tmp_word = tmp_word / 16 + %0100000000
-	elseif tmp_word < %0000100000000000 then
-		tmp_word = tmp_word / 32 + %0101000000
-	elseif tmp_word < %0001000000000000 then
-		tmp_word = tmp_word / 64 + %0110000000
-	elseif tmp_word < %0010000000000000 then
-		tmp_word = tmp_word / 128 + %0111000000
-	elseif tmp_word < %0100000000000000 then
-		tmp_word = tmp_word / 256 + %1000000000
-	elseif tmp_word < %1000000000000000 then
-		tmp_word = tmp_word / 512 + %1001000000
-	else
-		tmp_word = tmp_word / 1024 + %1010000000
-	endif
-	; Unused patterns available for extra resolution/scale
-	; %1011xxxxxx
-	; %1100xxxxxx
-	; %1101xxxxxx
-	; %1110xxxxxx
+	if tmp2_low_byte = 1 then bit_compress_16x
+
+    if tmp_word < 128 then
+        return
+    elseif tmp_word < 256 then
+        tmp_word = tmp_word / 2 + 64
+    elseif tmp_word < 512 then
+        tmp_word = tmp_word / 4 + 128
+    elseif tmp_word < 1024 then
+        tmp_word = tmp_word / 8 + 192
+    elseif tmp_word < 2048 then
+        tmp_word = tmp_word / 16 + 256
+    elseif tmp_word < 4096 then
+        tmp_word = tmp_word / 32 + 320
+    elseif tmp_word < 8192 then
+        tmp_word = tmp_word / 64 + 384
+    elseif tmp_word < 16384 then
+        tmp_word = tmp_word / 128 + 448
+    elseif tmp_word < 32768 then
+        tmp_word = tmp_word / 256 + 512
+    else
+        tmp_word = tmp_word / 512 + 576
+    endif
+    return
+
+bit_compress_16x:
+	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
+    if tmp_word < 64 then
+        tmp_word = tmp_word * 4 ; special case?
+    elseif tmp_word < 128 then
+        tmp_word = tmp_word * 2 + 128 ; special case?
+    elseif tmp_word < 256 then
+        tmp_word = tmp_word / 2 + 320
+    elseif tmp_word < 512 then
+        tmp_word = tmp_word / 4 + 384
+    elseif tmp_word < 1024 then
+        tmp_word = tmp_word / 8 + 448
+    elseif tmp_word < 2048 then
+        tmp_word = tmp_word / 16 + 512
+    elseif tmp_word < 4096 then
+        tmp_word = tmp_word / 32 + 576
+    elseif tmp_word < 8192 then
+        tmp_word = tmp_word / 64 + 640
+    elseif tmp_word < 16384 then
+        tmp_word = tmp_word / 128 + 704
+    elseif tmp_word < 32768 then
+        tmp_word = tmp_word / 256 + 768
+    else
+        tmp_word = tmp_word / 512 + 832
+    endif
+	; Unused pattern available for extra resolution/scale?
 	; %1111xxxxxx
 	return
 
