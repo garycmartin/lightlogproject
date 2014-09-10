@@ -241,31 +241,32 @@ def download_data_from_lightlog(ser, args):
             if data[-6:] == 'Hello?':
                 data = ''
                 expect_data = False
+                minute_asci = get_minute_day_phase_asci()
 
                 if communication_phase == 0:
                     if args.cmd == 'a':
-                        ser.write('a') # a = request status output
+                        ser.write('a' + minute_asci) # a = request status output
                         expect_data = True
                     elif args.cmd == 'e':
-                        ser.write('e') # e = reset mem pointer!
+                        ser.write('e' + minute_asci) # e = reset mem pointer!
                     elif args.cmd == 'f':
-                        ser.write('f') # f = reset reboot counter
+                        ser.write('f' + minute_asci) # f = reset reboot counter
                     elif args.cal == '2.5k':
-                        ser.write('h') # h = calibrate to 2.5K lux source!!
+                        ser.write('h' + minute_asci) # h = calibrate to 2.5K lux source!!
                     elif args.cal == '5k':
-                        ser.write('i') # i = calibrate to 5K lux source!!
+                        ser.write('i' + minute_asci) # i = calibrate to 5K lux source!!
                     elif args.cal == '10k':
-                        ser.write('j') # j = calibrate to 10K lux source!!
+                        ser.write('j' + minute_asci) # j = calibrate to 10K lux source!!
                     elif args.cmd == 'l':
-                        ser.write('l') # l = zero light goal
+                        ser.write('l' + minute_asci) # l = zero light goal
                     elif args.cmd == 'm':
-                        ser.write('m') # m = zero day phase (peak sleep point)
+                        ser.write('m' + minute_asci) # m = zero day phase (peak sleep point)
                     elif args.cmd == 'n':
-                        ser.write('n') # n = half day phase (peak sleep point + half day)
+                        ser.write('n' + minute_asci) # n = half day phase (peak sleep point + 50%)
                     elif args.cmd == 'z':
-                        ser.write('z') # z = first boot init (but not leave calibration alone)!
+                        ser.write('z' + minute_asci) # z = first boot init
                     else:
-                        ser.write('c') # c = download
+                        ser.write('c' + minute_asci) # c = download
                         expect_data = True
                     communication_phase = 1
                     sys.stdout.write('Communicating with Light Log.')
@@ -283,6 +284,19 @@ def download_data_from_lightlog(ser, args):
         print >> sys.stderr
 
     return data, seconds_now, expect_data
+
+def get_minute_day_phase_asci():
+    """\
+    Return low and high asci bytes for todays minutes (used to sync phase).
+    """
+    now = datetime.datetime.now()
+    # TODO: Make this a 4am reset point by default
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    minute_since_midnight = int(round((now - midnight).total_seconds() / 60.0))
+    print >> sys.stderr, 'Minute phase %d' % minute_since_midnight
+    minute_low_byte = minute_since_midnight & 0xFF
+    minute_high_byte = minute_since_midnight >>8 & 0xFF
+    return chr(minute_low_byte) + chr(minute_high_byte)
 
 def extract_data(data, args, seconds_now, status_dict):
     """\
