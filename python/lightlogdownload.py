@@ -136,8 +136,8 @@ def parse_status_header(status):
 
     # Convert relavent strings to int
     for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW',
-              'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR',
-              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR'):
+              'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', 'Period',
+              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
         if i in status_dict:
             status_dict[i] = int(status_dict[i])
     return status_dict
