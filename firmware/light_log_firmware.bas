@@ -577,9 +577,6 @@ check_serial_comms:
         case "j"
         gosub calibrate_10Klux
 
-        case "k"
-        gosub calibrate_20Klux
-
         case "l"
         gosub zero_light_goal
 
@@ -610,13 +607,6 @@ calibrate_10Klux:
     write REGISTER_10KLUX_GREEN_WORD, word green
     write REGISTER_10KLUX_BLUE_WORD, word blue
     write REGISTER_10KLUX_WHITE_WORD, word white
-    return
-
-calibrate_20Klux:
-    write REGISTER_20KLUX_RED_WORD, word red
-    write REGISTER_20KLUX_GREEN_WORD, word green
-    write REGISTER_20KLUX_BLUE_WORD, word blue
-    write REGISTER_20KLUX_WHITE_WORD, word white
     return
 
 header_block:
