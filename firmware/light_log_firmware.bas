@@ -553,7 +553,7 @@ flash_led:
 check_serial_comms:
     gosub comms_speed
     sertxd("Hello?")
-    serrxd [150, serial_checked], ser_in_byte
+    serrxd [150, serial_checked], ser_in_byte, tmp_low_byte, tmp_high_byte
 
     select case ser_in_byte
         case "a"
@@ -582,12 +582,6 @@ check_serial_comms:
 
         case "l"
         gosub zero_light_goal
-
-        case "m"
-        gosub zero_day_phase
-
-        case "n"
-        gosub half_day_phase
 
         case "z"
         gosub first_boot_init
@@ -683,9 +677,24 @@ header_block:
     sertxd("head_eof")
     return
 
+update_time_and_phase:
+	; Update day phase (crude test to check the value is at least sane)
+    if tmp_word > 1440 then
+		; Do nothing, must be bad value
+		return
+	endif
+    read REGISTER_DAY_PHASE_WORD, word tmp2_word
+	; Try and estimate if daily accumulated goal should be reset
+	if tmp2_word > 1080 and tmp_word < 360 then
+	    write REGISTER_LIGHT_GOAL_WORD, 0, 0
+	endif
+    write REGISTER_DAY_PHASE_WORD, word tmp_word
+	return
+
 dump_data:
     ; Output data oldest to newest
     gosub header_block
+	gosub update_time_and_phase ; serial comms word passed via tmp_word
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
     if tmp_word > 0 then
         ; Dump end block of memory first if memory has wrapped one or more times
@@ -735,7 +744,7 @@ first_boot_init:
     gosub reset_pointer
     gosub reset_reboot_counter
     gosub zero_light_goal
-    gosub zero_day_phase
+    write REGISTER_DAY_PHASE_WORD, 0, 0
     write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
 
     ; Generate unique hardware id (seed from sensor and battery readings)
@@ -755,14 +764,6 @@ first_boot_init:
 
 zero_light_goal:
     write REGISTER_LIGHT_GOAL_WORD, 0, 0
-    return
-
-zero_day_phase:
-    write REGISTER_DAY_PHASE_WORD, 0, 0
-    return
-
-half_day_phase:
-    write REGISTER_DAY_PHASE_WORD, 0xD0, 0x02 ; 720
     return
 
 default_light_calibration:
