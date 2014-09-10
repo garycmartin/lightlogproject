@@ -51,9 +51,12 @@ POSSIBILITY OF SUCH DAMAGE.
 ; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 2.5k
 ; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 5k
 ; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 10k
-table 15, (0xA1, 0x02, 0xA8, 0x02, 0xA2, 0x02, 0xF3, 0x02, _
-           0xB5, 0x02, 0xE3, 0x02, 0xBD, 0x02, 0x2D, 0x03, _
-           0xF2, 0x02, 0x22, 0x03, 0xFB, 0x02, 0x6C, 0x03)
+;table 15, (0xA1, 0x02, 0xA8, 0x02, 0xA2, 0x02, 0xF3, 0x02, _
+;           0xB5, 0x02, 0xE3, 0x02, 0xBD, 0x02, 0x2D, 0x03, _
+;           0xF2, 0x02, 0x22, 0x03, 0xFB, 0x02, 0x6C, 0x03)
+table 15, (0xCB, 0x02, 0xD2, 0x02, 0xCC, 0x02, 0x22, 0x03, _
+           0xE0, 0x02, 0x11, 0x03, 0xE8, 0x02, 0x5F, 0x03, _
+           0x12, 0x03, 0x54, 0x03, 0x2A, 0x03, 0xA2, 0x03)
 
 #no_data ; Make sure re-programming does not zap eeprom data memory
 #picaxe 14m2
@@ -400,12 +403,15 @@ read_RGBW_sensors:
     return
 
 bit_compress:
-	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
-	if tmp2_low_byte = 1 then bit_compress_16x
+	; Check flag for x16 vs x1 exposure gain
+	if tmp2_low_byte = 1 then gosub bit_compress_1x
+	gosub bit_compress_16x
+	tmp_word = tmp_word / 16 + tmp_word ; scale to 0-1023 (1018) 10bit range per chanel
+	return
 
-    if tmp_word < 128 then
-        return
-    elseif tmp_word < 256 then
+bit_compress_16x:
+	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
+    if tmp_word >= 128 or tmp_word < 256 then
         tmp_word = tmp_word / 2 + 64
     elseif tmp_word < 512 then
         tmp_word = tmp_word / 4 + 128
@@ -426,7 +432,7 @@ bit_compress:
     endif
     return
 
-bit_compress_16x:
+bit_compress_1x:
 	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
     if tmp_word < 64 then
         tmp_word = tmp_word * 4 ; special case?
@@ -451,8 +457,6 @@ bit_compress_16x:
     else
         tmp_word = tmp_word / 512 + 832
     endif
-	; Unused pattern available for extra resolution/scale?
-	; %1111xxxxxx
 	return
 
 check_user_button:
