@@ -219,7 +219,7 @@ main:
         tmp2_word = tmp2_word - tmp_word ; 5K - 2.5K calibration delta
         tmp2_word = 500 / tmp2_word ; scale factor for one sensor unit
         tmp_word = white_avg - tmp_word * tmp2_word + 500; goal points between 500 and 1,000
-        gosub goal_update
+        goto goal_update
     endif
 
     read REGISTER_10KLUX_WHITE_WORD, word tmp_word
@@ -227,13 +227,26 @@ main:
         tmp_word = tmp_word - tmp2_word ; 10K - 5K calibration delta
         tmp_word = 1000 / tmp_word ; scale factor for one sensor unit
         tmp_word = white_avg - tmp2_word * tmp_word + 1000; goal points between 1,000 and 2,000
-        gosub goal_update
+        goto goal_update
     endif
 
+	; Check for brighter than 10K lux max score
     if white_avg >= tmp_word then
         tmp_word = 2000 ; maximum 2,000 points per min
-        gosub goal_update
+	else
+        goto end_goal_update
     endif
+
+	goal_update:
+		; Update the goal units reached so far into memory
+    	read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
+    	tmp2_word = tmp2_word + tmp_word
+    	if tmp2_word > 60000 then
+    	    tmp2_word = 60000
+    	endif
+    	write REGISTER_LIGHT_GOAL_WORD, word tmp2_word
+
+	end_goal_update:
 
     ; Keep track of day phase cycle
     read REGISTER_DAY_PHASE_WORD, word tmp_word
@@ -293,16 +306,6 @@ main:
     endif
 
     goto main
-
-goal_update:
-	; Update the goal units reached so far into memory
-    read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
-    tmp2_word = tmp2_word + tmp_word
-    if tmp2_word > 60000 then
-        tmp2_word = 60000
-    endif
-    write REGISTER_LIGHT_GOAL_WORD, word tmp2_word
-	return
 
 delay_2sec:
     ; Delay for 2 sec without using the low power sleep watchdog timer 
