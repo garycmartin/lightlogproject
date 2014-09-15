@@ -173,6 +173,7 @@ init:
     tmp_word = tmp_word + 1
     write REGISTER_REBOOT_COUNT_WORD, word tmp_word
 
+	gosub default_light_calibration ; Only do this if button held down at boot?
     gosub flash_led
 
     flag = FLAG_REBOOT
@@ -757,7 +758,7 @@ zero_light_goal:
 
 default_light_calibration:
     ; Default calibration using full spectrum white light measured at room temp.
-    ; Copies 32 table bytes into matching memory data address 15 onwards
+    ; Copies table bytes into matching memory data address 15 onwards
 	for tmp_low_byte = 15 to 39
 		readtable tmp_low_byte, tmp_high_byte
 		write tmp_low_byte, tmp_high_byte
