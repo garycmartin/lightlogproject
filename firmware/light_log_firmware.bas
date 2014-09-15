@@ -408,8 +408,11 @@ read_RGBW_sensors:
 
 bit_compress:
 	; Check flag for x16 vs x1 exposure gain
-	if tmp2_low_byte = 1 then gosub bit_compress_1x
-	gosub bit_compress_16x
+	if tmp2_low_byte = 1 then
+		gosub bit_compress_1x
+	else
+		gosub bit_compress_16x
+	endif
 	tmp_word = tmp_word / 16 + tmp_word ; scale to 0-1023 (1018) 10bit range per chanel
 	return
 
