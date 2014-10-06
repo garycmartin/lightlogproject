@@ -322,7 +322,7 @@ def extract_data(data, args, seconds_now, status_dict):
 
         flags = ord(data[i + 5]) >> 6
         # 11 = reboot
-        # 01 = blocked sensors
+        # 01 = blocked sensors (not currently used)
         # 10 = button press
         # 00 = OK
 
@@ -330,42 +330,37 @@ def extract_data(data, args, seconds_now, status_dict):
         data_rows.append([r, g, b, w, seconds, flags])
         seconds += STEP_SECONDS
 
-    return data_rows
-
-def append_data_to_file(data_rows, args, status_dict):
-    """\
-    Append data to the end of an existing log file, or create a new file if none exists.
-    """
     try:
         f = open(args.file, "rb")
     except IOError:
-        # File does not exist so switch to creating a new file
-        output_data_to_file(data_rows, args, status_dict)
+        # File does not exist, just use extrapolated start time estimate
+        return data_rows
     else:
+        # See if we can use the last save data to calculate accurate timing
         last_log_end = get_timestamp_from_end_of_file(f)
-        time_correct = last_log_end
-        count_rows = 0
-        f.close()
-
-        f = open(args.file, "a")
-        if data_rows[0][4] > last_log_end:
-            print >> sys.stderr, "WARNING: %dmin gap between this and existing log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
-            for row in data_rows:
-                f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
-                count_rows += 1
+        file_end_scent = get_scent_from_end_of_file(f)
+        f.close()        
+        skip_rows = search_for_scent(data_rows, file_end_scent)
+        if skip_rows != 0:
+            # Interpolate new time stamps using skip_rows scent and last log end
+            print >> sys.stderr, "Data scent found! @", skip_rows, ":)"
+            data_rows = data_rows[skip_rows:]
+            new_seconds = last_log_end
+            new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
+            for i in range(len(data_rows)):
+                data_rows[i][4] = int(new_seconds + (new_step_seconds * i))
+        
+        elif data_rows[0][4] < last_log_end:
+            # Estimate using step seconds
+            print >> sys.stderr, "Using step secconds based estimate fallback."
+            while data_rows[0][4] < last_log_end:
+                data_rows.pop(0)
 
         else:
-            # Append only newer data than existing log
-            for row in data_rows:
-                if row[4] > last_log_end:
-                    time_correct += STEP_SECONDS
-                    row[4] = time_correct
-                    f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
-                    count_rows += 1
-        f.close()
-
-        print >> sys.stderr, "Appended", count_rows,
-        print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+            # No scent found and step seconds estimate newer than last log end
+            print >> sys.stderr, "WARNING: estimated %dmin gap between this and previous log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
+            
+    return data_rows
 
 
 def get_timestamp_from_end_of_file(f):
@@ -375,9 +370,104 @@ def get_timestamp_from_end_of_file(f):
     return int(f.readline().split(',')[4])
 
 
-def output_data_to_file(data_rows, args, status_dict):
+def get_scent_from_end_of_file(f):
     """\
-    Output data rows to file, will overwrite if file already exists.
+    Get last five RGBW data values from end of file.
+    
+    Could include the extra data value (especially if it gains more unique data).
+    """
+    f.seek(-2, 2)
+    for i in range(4):
+        seek_previous_new_line(f)
+        f.seek(-2, 1)
+    seek_previous_new_line(f)
+    fifth = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    forth = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    third = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    second = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    last = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    return [fifth, forth, third, second, last]
+
+
+def seek_previous_new_line(f):
+    """\
+    Relative seek backwards until a new line is found.
+    """
+    while f.read(1) != "\n":
+        f.seek(-2, 1)
+
+
+def string_to_number(s):
+    """\
+    Return an int from a string if possible, or try a float.
+    """
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
+
+
+def search_for_scent(data_rows, file_end_scent):
+    """\
+    Search for scent from the end of the last file in the new data set.
+    """
+    skip_rows = 0
+    
+    # Check I have scent with some vaguly interesting data in it
+    if file_end_scent[0] == file_end_scent[1] and \
+        file_end_scent[1] == file_end_scent[2] and \
+        file_end_scent[2] == file_end_scent[3] and \
+        file_end_scent[3] == file_end_scent[4]:
+        return skip_rows
+            
+    # TODO: toughen code to handle small log file case
+    for search_row in range(len(data_rows)):
+        if [i[0:4] for i in data_rows[search_row:search_row + 5]] == file_end_scent:
+            skip_rows = search_row + 5
+            if skip_rows >= len(data_rows):
+                return 0
+                
+            print >> sys.stderr, "Scent", file_end_scent
+            
+            #TODO: Search from new skip_rows and see if there is another (return 0 if so)
+            
+            return skip_rows
+    
+    return skip_rows
+
+
+def store_data_to_file(data_rows, args, status_dict):
+    """\
+    Append data to the end of an existing log file, or create a new file if none exists.
+    """
+    try:
+        f = open(args.file, "rb")
+    except IOError:
+        # File does not exist, creating a new file
+        write_data_to_new_file(data_rows, args, status_dict)
+    else:
+        append_data_to_end_of_file(data_rows, args, status_dict)
+
+
+def append_data_to_end_of_file(data_rows, args, status_dict):
+    """\
+    Append data to the end of an existing log file.
+    """
+    count_rows = 0
+    f = open(args.file, "a")
+    for row in data_rows:
+        f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
+        count_rows += 1
+
+    f.close()
+
+    print >> sys.stderr, "Appended", count_rows,
+    print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+
+
+def write_data_to_new_file(data_rows, args, status_dict):
+    """\
+    Save data rows to file, will overwrite if file already exists.
     """
     f = open(args.file, "w")
 
@@ -453,9 +543,8 @@ def main():
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
 
-        data_rows = extract_data(data, args, seconds_now, status_dict)
-
         if args.stdout:
+            data_rows = extract_data(data, args, seconds_now, status_dict)
             output_data_to_stdout(data_rows, args, status_dict)
 
         else:
@@ -463,21 +552,26 @@ def main():
                 if args.both:
                     args.raw = True
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
                     args.raw = None
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
                 elif args.raw:
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
                 else:
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
             else:
-                append_data_to_file(data_rows, args, status_dict)
+                data_rows = extract_data(data, args, seconds_now, status_dict)
+                store_data_to_file(data_rows, args, status_dict)
 
         print >> sys.stderr, "Battery %dmV" % (status_dict['Batt'])
 
