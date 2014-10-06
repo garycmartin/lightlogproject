@@ -140,6 +140,9 @@ def parse_status_header(status):
               '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
         if i in status_dict:
             status_dict[i] = int(status_dict[i])
+            
+    print >> sys.stderr, 'Device old day phase %dmin' % status_dict['Phase']
+
     return status_dict
 
 def convert_to_lux(red, green, blue, white, status_dict):
@@ -285,6 +288,7 @@ def download_data_from_lightlog(ser, args):
 
     return data, seconds_now, expect_data
 
+
 def get_minute_day_phase_asci():
     """\
     Return low and high asci bytes for todays minutes (used to sync phase).
@@ -293,10 +297,13 @@ def get_minute_day_phase_asci():
     # TODO: Make this a 4am reset point by default
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     minute_since_midnight = int(round((now - midnight).total_seconds() / 60.0))
-    print >> sys.stderr, 'Minute phase %d' % minute_since_midnight
     minute_low_byte = minute_since_midnight & 0xFF
     minute_high_byte = minute_since_midnight >>8 & 0xFF
+
+    print >> sys.stderr, 'Systems day phase %dmin' % minute_since_midnight
+
     return chr(minute_low_byte) + chr(minute_high_byte)
+
 
 def extract_data(data, args, seconds_now, status_dict):
     """\
@@ -305,6 +312,7 @@ def extract_data(data, args, seconds_now, status_dict):
     data = data[:-8]
     data_rows = []
     seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
+
     for i in range(0, len(data), 6):
 
         r = ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256)
