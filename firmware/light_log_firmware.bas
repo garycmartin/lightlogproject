@@ -418,7 +418,9 @@ bit_compress:
 
 bit_compress_16x:
 	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
-    if tmp_word >= 128 and tmp_word < 256 then
+    if tmp_word < 128 then
+		return
+	elseif tmp_word < 256 then
         tmp_word = tmp_word / 2 + 64
     elseif tmp_word < 512 then
         tmp_word = tmp_word / 4 + 128
