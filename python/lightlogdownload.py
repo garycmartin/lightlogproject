@@ -327,7 +327,14 @@ def extract_data(data, args, seconds_now, status_dict):
         # 00 = OK
 
         # Raw sensor data
-        data_rows.append([r, g, b, w, seconds, flags])
+        if args.raw:
+            # Raw sensor data
+            data_rows.append([r, g, b, w, seconds, flags])
+    
+        else:
+            r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
+            data_rows.append([r, g, b, w, seconds, flags])
+            
         seconds += STEP_SECONDS
 
     try:
@@ -339,7 +346,8 @@ def extract_data(data, args, seconds_now, status_dict):
         # See if we can use the last save data to calculate accurate timing
         last_log_end = get_timestamp_from_end_of_file(f)
         file_end_scent = get_scent_from_end_of_file(f)
-        f.close()        
+        f.close()
+ 
         skip_rows = search_for_scent(data_rows, file_end_scent)
         if skip_rows != 0:
             # Interpolate new time stamps using skip_rows scent and last log end
@@ -456,7 +464,7 @@ def append_data_to_end_of_file(data_rows, args, status_dict):
     count_rows = 0
     f = open(args.file, "a")
     for row in data_rows:
-        f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
+        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
         count_rows += 1
 
     f.close()
@@ -475,7 +483,7 @@ def write_data_to_new_file(data_rows, args, status_dict):
         f.write("red,green,blue,white,epoch,flags\n")
 
     for row in data_rows:
-        f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
+        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
     f.close()
 
     print >> sys.stderr, "Wrote", len(data_rows),
@@ -490,23 +498,10 @@ def output_data_to_stdout(data_rows, args, status_dict):
         print "red,green,blue,white,epoch,flags"
 
     for row in data_rows:
-        print "%s,%s,%s,%s,%s,%s" % raw_or_lux_output(row, args, status_dict)
+        print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
 
     print >> sys.stderr, "Downloaded", len(data_rows),
     print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
-
-
-def raw_or_lux_output(row, args, status_dict):
-    """\
-    Process raw red, green, blue, white data to lux if needed.
-    """
-    if args.raw:
-        # Raw sensor data
-        return (row[0], row[1], row[2], row[3], row[4], row[5])
-
-    else:
-        r, g, b, w = convert_to_lux(row[0], row[1], row[2], row[3], status_dict)
-        return (r, g, b, w, row[4], row[5])
 
 
 def main():
