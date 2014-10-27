@@ -216,3 +216,19 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+python/.idea/.name
+
+python/.idea/encodings.xml
+
+python/.idea/misc.xml
+
+python/.idea/modules.xml
+
+python/.idea/python.iml
+
+python/.idea/scopes/scope_settings.xml
+
+python/.idea/vcs.xml
+
+python/.idea/workspace.xml
