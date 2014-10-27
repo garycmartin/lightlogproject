@@ -159,19 +159,25 @@ def convert_to_lux(red, green, blue, white, status_dict):
     RGB values are not (yet) calibrated to a set of known colour sources.
     """
 
-    r = float('%.4f' % linear_interpolation(red))
-    g = float('%.4f' % linear_interpolation(green))
-    b = float('%.4f' % linear_interpolation(blue))
-    w = float('%.4f' % linear_interpolation(white))
+    HW = status_dict['HW']
+    r = float('%.4f' % linear_interpolation(red, HW))
+    g = float('%.4f' % linear_interpolation(green, HW))
+    b = float('%.4f' % linear_interpolation(blue, HW))
+    w = float('%.4f' % linear_interpolation(white, HW))
 
     return r, g, b, w
 
 
-def linear_interpolation(x):
+def linear_interpolation(x, HW):
     """\
-    Linear interpolation between recorded data point values.
+    Linear interpolation between recorded data point values from HW4 digital sensor devices.
     """
-    calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
+    if HW == 4:
+        # SMT digital sensor
+        calibration_data = [(0, 0), (1, 29), (8, 175), (20, 258), (40, 321), (140, 446), (500, 572), (1000, 632), (1500, 658), (2000, 716), (2500, 0x322), (5000, 0x35F), (10000, 0x3A2), (20000, 945), (27000, 953), (85000, 0x3FF)]
+    else:
+        # LDR prototypes
+        calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
     calibration_data.reverse()
     x = float(x)
     result = None
@@ -184,34 +190,6 @@ def linear_interpolation(x):
 
     return result
 
-def inverse_harris(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/YieldDensity/InverseHarris/
-    """
-    x = float(x)
-    a = -1.0418515764334417E+00
-    b = 1.4647346407912545E+02
-    c = -7.2246864466197369E-01
-    return x / (a + b * x ** c)
-
-def ramberg_osgood_fit(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/Engineering/Ramberg-Osgood/
-    """
-    x = float(x)
-    youngs_modulus = 1.9765780295845900E-01
-    k = 7.4474601294925719E+02
-    n = 1.9137962029987306E-02
-    return (x / youngs_modulus) + (x / k) ** (1.0 / n)
-
-def exponential_fit(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/Exponential/Exponential/
-    """
-    x = float(x)
-    a = 2.1242230658871749E-15
-    b = 4.8842737652298622E-02
-    return a * math.exp(b * x)
 
 def download_data_from_lightlog(ser, args):
     """\
