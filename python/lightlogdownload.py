@@ -28,9 +28,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Download and convert data from a Light Log <http://lightlogproject.org>.
+"""Download and convert data from a Lightlog <http://lightlogproject.org>.
 
-Raw data bytes are downloaded from a Light Log device through a serial port and
+Raw data bytes are downloaded from a Lightlog device through a serial port and
 saved as a CSV file for easy processing with external tools. Time stamps use
 calculations based on the local systems time, so be aware your local clock
 should be reasonable accurate when downloading.
@@ -48,7 +48,7 @@ from serial.tools import list_ports
 #SERIAL_BAUD = 38400
 SERIAL_BAUD = 19200
 STEP_SECONDS = 60 # default grab from status 'Period' if available
-VERSION = 'v0.11'
+VERSION = 'v0.12'
 
 def get_args():
     """\
@@ -82,7 +82,7 @@ def get_args():
                        choices=['a', 'e', 'f', 'l', 'm', 'n', 'z'])
     group.add_argument("--cal",
                        help="calibrate hardware to known lux light sources",
-                       choices=['2.5k', '5k', '10k', '20k'])
+                       choices=['2.5k', '5k', '10k'])
 
     if parser.parse_args().version:
         print >> sys.stderr, "Version", VERSION
@@ -135,11 +135,14 @@ def parse_status_header(status):
     status_dict['Batt'] = int(status_dict['Batt'][:-2])
 
     # Convert relavent strings to int
-    for i in ('Goal', 'FW', '20KluxG', '20KluxB', '10KluxB', '20KluxW',
-              '20KluxR', '5KluxB', '5KluxG', '5KluxR', '5KluxW', 'Phase',
-              '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', '10KluxG',
-              'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR'):
-        status_dict[i] = int(status_dict[i])
+    for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW',
+              'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', 'Period',
+              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
+        if i in status_dict:
+            status_dict[i] = int(status_dict[i])
+            
+    print >> sys.stderr, 'Device old day phase %dmin' % status_dict['Phase']
+
     return status_dict
 
 def convert_to_lux(red, green, blue, white, status_dict):
@@ -147,29 +150,34 @@ def convert_to_lux(red, green, blue, white, status_dict):
     Use pre-fitted average lux test data function to convert to lux.
 
     Ideally this function should use the current devices calibration data
-    status_dict['2.5KluxW'], status_dict['5KluxW'], status_dict['10KluxW']
-    status_dict['20KluxW'], etc to convert sensor data to lux. Currently
-    this function has been pre-fitted to average calibration data from
-    multiple devices.
+    status_dict['2.5KluxW'], status_dict['5KluxW'], status_dict['10KluxW'],
+    etc to convert sensor data to lux. Currently this function has been
+    pre-fitted to average calibration data from multiple devices.
         RGB values are scaled relative to the clear sensor lux value as an
     estimate for how much each section of the spectra may map into the
     total lux value (lux is a measurement of the total visible spectrum EMF).
     RGB values are not (yet) calibrated to a set of known colour sources.
     """
 
-    r = float('%.4f' % linear_interpolation(red))
-    g = float('%.4f' % linear_interpolation(green))
-    b = float('%.4f' % linear_interpolation(blue))
-    w = float('%.4f' % linear_interpolation(white))
+    HW = status_dict['HW']
+    r = float('%.4f' % linear_interpolation(red, HW))
+    g = float('%.4f' % linear_interpolation(green, HW))
+    b = float('%.4f' % linear_interpolation(blue, HW))
+    w = float('%.4f' % linear_interpolation(white, HW))
 
     return r, g, b, w
 
 
-def linear_interpolation(x):
+def linear_interpolation(x, HW):
     """\
-    Linear interpolation between recorded data point values.
+    Linear interpolation between recorded data point values from HW4 digital sensor devices.
     """
-    calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
+    if HW == 4:
+        # SMT digital sensor
+        calibration_data = [(0, 0), (1, 29), (8, 175), (20, 258), (40, 321), (140, 446), (500, 572), (1000, 632), (1500, 658), (2000, 716), (2500, 0x322), (5000, 0x35F), (10000, 0x3A2), (20000, 945), (27000, 953), (85000, 0x3FF)]
+    else:
+        # LDR prototypes
+        calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
     calibration_data.reverse()
     x = float(x)
     result = None
@@ -182,34 +190,6 @@ def linear_interpolation(x):
 
     return result
 
-def inverse_harris(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/YieldDensity/InverseHarris/
-    """
-    x = float(x)
-    a = -1.0418515764334417E+00
-    b = 1.4647346407912545E+02
-    c = -7.2246864466197369E-01
-    return x / (a + b * x ** c)
-
-def ramberg_osgood_fit(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/Engineering/Ramberg-Osgood/
-    """
-    x = float(x)
-    youngs_modulus = 1.9765780295845900E-01
-    k = 7.4474601294925719E+02
-    n = 1.9137962029987306E-02
-    return (x / youngs_modulus) + (x / k) ** (1.0 / n)
-
-def exponential_fit(x):
-    """\
-    Curve fitted lux function http://zunzun.com/Equation/2/Exponential/Exponential/
-    """
-    x = float(x)
-    a = 2.1242230658871749E-15
-    b = 4.8842737652298622E-02
-    return a * math.exp(b * x)
 
 def download_data_from_lightlog(ser, args):
     """\
@@ -242,33 +222,32 @@ def download_data_from_lightlog(ser, args):
             if data[-6:] == 'Hello?':
                 data = ''
                 expect_data = False
+                minute_asci = get_minute_day_phase_asci()
 
                 if communication_phase == 0:
                     if args.cmd == 'a':
-                        ser.write('a') # a = request status output
+                        ser.write('a' + minute_asci) # a = request status output
                         expect_data = True
                     elif args.cmd == 'e':
-                        ser.write('e') # e = reset mem pointer!
+                        ser.write('e' + minute_asci) # e = reset mem pointer!
                     elif args.cmd == 'f':
-                        ser.write('f') # f = reset reboot counter
+                        ser.write('f' + minute_asci) # f = reset reboot counter
                     elif args.cal == '2.5k':
-                        ser.write('h') # h = calibrate to 2.5K lux source!!
+                        ser.write('h' + minute_asci) # h = calibrate to 2.5K lux source!!
                     elif args.cal == '5k':
-                        ser.write('i') # i = calibrate to 5K lux source!!
+                        ser.write('i' + minute_asci) # i = calibrate to 5K lux source!!
                     elif args.cal == '10k':
-                        ser.write('j') # j = calibrate to 10K lux source!!
-                    elif args.cal == '20k':
-                        ser.write('k') # k = calibrate to 20K lux source!!
+                        ser.write('j' + minute_asci) # j = calibrate to 10K lux source!!
                     elif args.cmd == 'l':
-                        ser.write('l') # l = zero light goal
+                        ser.write('l' + minute_asci) # l = zero light goal
                     elif args.cmd == 'm':
-                        ser.write('m') # m = zero day phase (peak sleep point)
+                        ser.write('m' + minute_asci) # m = zero day phase (peak sleep point)
                     elif args.cmd == 'n':
-                        ser.write('n') # n = half day phase (peak sleep point + half day)
+                        ser.write('n' + minute_asci) # n = half day phase (peak sleep point + 50%)
                     elif args.cmd == 'z':
-                        ser.write('z') # z = first boot init (but not leave calibration alone)!
+                        ser.write('z' + minute_asci) # z = first boot init
                     else:
-                        ser.write('c') # c = download
+                        ser.write('c' + minute_asci) # c = download
                         expect_data = True
                     communication_phase = 1
                     sys.stdout.write('Communicating with Light Log.')
@@ -287,6 +266,23 @@ def download_data_from_lightlog(ser, args):
 
     return data, seconds_now, expect_data
 
+
+def get_minute_day_phase_asci():
+    """\
+    Return low and high asci bytes for todays minutes (used to sync phase).
+    """
+    now = datetime.datetime.now()
+    # TODO: Make this a 4am reset point by default
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    minute_since_midnight = int(round((now - midnight).total_seconds() / 60.0))
+    minute_low_byte = minute_since_midnight & 0xFF
+    minute_high_byte = minute_since_midnight >>8 & 0xFF
+
+    print >> sys.stderr, 'Systems day phase %dmin' % minute_since_midnight
+
+    return chr(minute_low_byte) + chr(minute_high_byte)
+
+
 def extract_data(data, args, seconds_now, status_dict):
     """\
     Parse raw byte data block and return a list of row light data.
@@ -294,6 +290,7 @@ def extract_data(data, args, seconds_now, status_dict):
     data = data[:-8]
     data_rows = []
     seconds = seconds_now - (len(data) / 6 * STEP_SECONDS)
+
     for i in range(0, len(data), 6):
 
         r = ord(data[i]) + ((ord(data[i + 4]) & 0b11) * 256)
@@ -303,50 +300,53 @@ def extract_data(data, args, seconds_now, status_dict):
 
         flags = ord(data[i + 5]) >> 6
         # 11 = reboot
-        # 01 = blocked sensors
+        # 01 = blocked sensors (not currently used)
         # 10 = button press
         # 00 = OK
 
         # Raw sensor data
-        data_rows.append([r, g, b, w, seconds, flags])
+        if args.raw:
+            # Raw sensor data
+            data_rows.append([r, g, b, w, seconds, flags])
+    
+        else:
+            r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
+            data_rows.append([r, g, b, w, seconds, flags])
+            
         seconds += STEP_SECONDS
 
-    return data_rows
-
-def append_data_to_file(data_rows, args, status_dict):
-    """\
-    Append data to the end of an existing log file, or create a new file if none exists.
-    """
     try:
         f = open(args.file, "rb")
     except IOError:
-        # File does not exist so switch to creating a new file
-        output_data_to_file(data_rows, args, status_dict)
+        # File does not exist, just use extrapolated start time estimate
+        return data_rows
     else:
+        # See if we can use the last save data to calculate accurate timing
         last_log_end = get_timestamp_from_end_of_file(f)
-        time_correct = last_log_end
-        count_rows = 0
+        file_end_scent = get_scent_from_end_of_file(f)
         f.close()
-
-        f = open(args.file, "a")
-        if data_rows[0][4] > last_log_end:
-            print >> sys.stderr, "WARNING: %dmin gap between this and existing log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
-            for row in data_rows:
-                f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
-                count_rows += 1
+ 
+        skip_rows = search_for_scent(data_rows, file_end_scent)
+        if skip_rows != 0:
+            # Interpolate new time stamps using skip_rows scent and last log end
+            print >> sys.stderr, "Data scent found! @", skip_rows, ":)"
+            data_rows = data_rows[skip_rows:]
+            new_seconds = last_log_end
+            new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
+            for i in range(len(data_rows)):
+                data_rows[i][4] = int(new_seconds + (new_step_seconds * i))
+        
+        elif data_rows[0][4] < last_log_end:
+            # Estimate using step seconds
+            print >> sys.stderr, "Using step secconds based estimate fallback."
+            while data_rows[0][4] < last_log_end:
+                data_rows.pop(0)
 
         else:
-            # Append only newer data than existing log
-            for row in data_rows:
-                if row[4] > last_log_end:
-                    time_correct += STEP_SECONDS
-                    row[4] = time_correct
-                    f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
-                    count_rows += 1
-        f.close()
-
-        print >> sys.stderr, "Appended", count_rows,
-        print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+            # No scent found and step seconds estimate newer than last log end
+            print >> sys.stderr, "WARNING: estimated %dmin gap between this and previous log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
+            
+    return data_rows
 
 
 def get_timestamp_from_end_of_file(f):
@@ -356,9 +356,104 @@ def get_timestamp_from_end_of_file(f):
     return int(f.readline().split(',')[4])
 
 
-def output_data_to_file(data_rows, args, status_dict):
+def get_scent_from_end_of_file(f):
     """\
-    Output data rows to file, will overwrite if file already exists.
+    Get last five RGBW data values from end of file.
+    
+    Could include the extra data value (especially if it gains more unique data).
+    """
+    f.seek(-2, 2)
+    for i in range(4):
+        seek_previous_new_line(f)
+        f.seek(-2, 1)
+    seek_previous_new_line(f)
+    fifth = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    forth = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    third = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    second = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    last = [string_to_number(i) for i in f.readline().split(',')[:-2]]
+    return [fifth, forth, third, second, last]
+
+
+def seek_previous_new_line(f):
+    """\
+    Relative seek backwards until a new line is found.
+    """
+    while f.read(1) != "\n":
+        f.seek(-2, 1)
+
+
+def string_to_number(s):
+    """\
+    Return an int from a string if possible, or try a float.
+    """
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
+
+
+def search_for_scent(data_rows, file_end_scent):
+    """\
+    Search for scent from the end of the last file in the new data set.
+    """
+    skip_rows = 0
+    
+    # Check I have scent with some vaguly interesting data in it
+    if file_end_scent[0] == file_end_scent[1] and \
+        file_end_scent[1] == file_end_scent[2] and \
+        file_end_scent[2] == file_end_scent[3] and \
+        file_end_scent[3] == file_end_scent[4]:
+        return skip_rows
+            
+    # TODO: toughen code to handle small log file case
+    for search_row in range(len(data_rows)):
+        if [i[0:4] for i in data_rows[search_row:search_row + 5]] == file_end_scent:
+            skip_rows = search_row + 5
+            if skip_rows >= len(data_rows):
+                return 0
+                
+            print >> sys.stderr, "Scent", file_end_scent
+            
+            #TODO: Search from new skip_rows and see if there is another (return 0 if so)
+            
+            return skip_rows
+    
+    return skip_rows
+
+
+def store_data_to_file(data_rows, args, status_dict):
+    """\
+    Append data to the end of an existing log file, or create a new file if none exists.
+    """
+    try:
+        f = open(args.file, "rb")
+    except IOError:
+        # File does not exist, creating a new file
+        write_data_to_new_file(data_rows, args, status_dict)
+    else:
+        append_data_to_end_of_file(data_rows, args, status_dict)
+
+
+def append_data_to_end_of_file(data_rows, args, status_dict):
+    """\
+    Append data to the end of an existing log file.
+    """
+    count_rows = 0
+    f = open(args.file, "a")
+    for row in data_rows:
+        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
+        count_rows += 1
+
+    f.close()
+
+    print >> sys.stderr, "Appended", count_rows,
+    print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+
+
+def write_data_to_new_file(data_rows, args, status_dict):
+    """\
+    Save data rows to file, will overwrite if file already exists.
     """
     f = open(args.file, "w")
 
@@ -366,7 +461,7 @@ def output_data_to_file(data_rows, args, status_dict):
         f.write("red,green,blue,white,epoch,flags\n")
 
     for row in data_rows:
-        f.write("%s,%s,%s,%s,%s,%s\n" % raw_or_lux_output(row, args, status_dict))
+        f.write("%s,%s,%s,%s,%s,%s\n" % (row[0], row[1], row[2], row[3], row[4], row[5]))
     f.close()
 
     print >> sys.stderr, "Wrote", len(data_rows),
@@ -381,23 +476,10 @@ def output_data_to_stdout(data_rows, args, status_dict):
         print "red,green,blue,white,epoch,flags"
 
     for row in data_rows:
-        print "%s,%s,%s,%s,%s,%s" % raw_or_lux_output(row, args, status_dict)
+        print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
 
     print >> sys.stderr, "Downloaded", len(data_rows),
     print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
-
-
-def raw_or_lux_output(row, args, status_dict):
-    """\
-    Process raw red, green, blue, white data to lux if needed.
-    """
-    if args.raw:
-        # Raw sensor data
-        return (row[0], row[1], row[2], row[3], row[4], row[5])
-
-    else:
-        r, g, b, w = convert_to_lux(row[0], row[1], row[2], row[3], status_dict)
-        return (r, g, b, w, row[4], row[5])
 
 
 def main():
@@ -434,9 +516,8 @@ def main():
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
 
-        data_rows = extract_data(data, args, seconds_now, status_dict)
-
         if args.stdout:
+            data_rows = extract_data(data, args, seconds_now, status_dict)
             output_data_to_stdout(data_rows, args, status_dict)
 
         else:
@@ -444,21 +525,26 @@ def main():
                 if args.both:
                     args.raw = True
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
                     args.raw = None
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
                 elif args.raw:
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
                 else:
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
-                    append_data_to_file(data_rows, args, status_dict)
+                    data_rows = extract_data(data, args, seconds_now, status_dict)
+                    store_data_to_file(data_rows, args, status_dict)
 
             else:
-                append_data_to_file(data_rows, args, status_dict)
+                data_rows = extract_data(data, args, seconds_now, status_dict)
+                store_data_to_file(data_rows, args, status_dict)
 
         print >> sys.stderr, "Battery %dmV" % (status_dict['Batt'])
 
