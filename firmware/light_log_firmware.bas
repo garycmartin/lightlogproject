@@ -310,13 +310,15 @@ delay_2sec:
     ; More accurate, avoids intermittent crashes, but uses more power
     low EEPROM_POWER
     gosub low_speed
-    pauseus 1227 ; use mean value for testing
-    ;pauseus 1389 ; my daily worn test unit
-    ;pauseus 1380 ; white case with green sensor error
-    ;pauseus 1344 ; red case in livingroom window
-    ;pauseus 1318 ; red case on lamp in livingroom
-    ;pauseus 1286 ; blue case fridge
-    ;pauseus 1484 ; blue case bedroom window
+    pauseus 977 ; my SMT serial Lightlog (4147A88F)
+    ;pauseus 959 ; SMT serial Lightlog shipped to Martin (C2C1AF83)
+    ;pauseus 1227 ; use mean value for testing (large through hole)
+    ;pauseus 1389 ; my daily worn white test unit (large through hole)
+    ;pauseus 1380 ; white case with green sensor error (large through hole)
+    ;pauseus 1344 ; red case in livingroom window (large through hole)
+    ;pauseus 1318 ; red case on lamp in livingroom (large through hole)
+    ;pauseus 1286 ; blue case fridge (large through hole)
+    ;pauseus 1484 ; blue case bedroom window (large through hole)
     gosub normal_speed
     high EEPROM_POWER
     return
