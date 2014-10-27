@@ -28,9 +28,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Download and convert data from a Light Log <http://lightlogproject.org>.
+"""Download and convert data from a Lightlog <http://lightlogproject.org>.
 
-Raw data bytes are downloaded from a Light Log device through a serial port and
+Raw data bytes are downloaded from a Lightlog device through a serial port and
 saved as a CSV file for easy processing with external tools. Time stamps use
 calculations based on the local systems time, so be aware your local clock
 should be reasonable accurate when downloading.
@@ -48,7 +48,7 @@ from serial.tools import list_ports
 #SERIAL_BAUD = 38400
 SERIAL_BAUD = 19200
 STEP_SECONDS = 60 # default grab from status 'Period' if available
-VERSION = 'v0.11'
+VERSION = 'v0.12'
 
 def get_args():
     """\
