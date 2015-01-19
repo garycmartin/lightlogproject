@@ -329,7 +329,7 @@ def extract_data(data, args, seconds_now, status_dict):
         skip_rows = search_for_scent(data_rows, file_end_scent)
         if skip_rows != 0:
             # Interpolate new time stamps using skip_rows scent and last log end
-            print >> sys.stderr, "Data scent found! @", skip_rows, ":)"
+            print >> sys.stderr, "Good join between previous and new data."
             data_rows = data_rows[skip_rows:]
             new_seconds = last_log_end
             new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
@@ -338,7 +338,7 @@ def extract_data(data, args, seconds_now, status_dict):
         
         elif data_rows[0][4] < last_log_end:
             # Estimate using step seconds
-            print >> sys.stderr, "Using step secconds based estimate fallback."
+            print >> sys.stderr, "Using step seconds to estimate time stamp."
             while data_rows[0][4] < last_log_end:
                 data_rows.pop(0)
 
@@ -413,8 +413,6 @@ def search_for_scent(data_rows, file_end_scent):
             if skip_rows >= len(data_rows):
                 return 0
                 
-            print >> sys.stderr, "Scent", file_end_scent
-            
             #TODO: Search from new skip_rows and see if there is another (return 0 if so)
             
             return skip_rows
