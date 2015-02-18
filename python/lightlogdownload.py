@@ -54,7 +54,7 @@ def get_args():
     """\
     Parse and return command line arguments.
     """
-    parser = argparse.ArgumentParser(description='Download, convert and save data from Light Log device. Without arguments data will be saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if the log file already exists, new data will be appended to the log.')
+    parser = argparse.ArgumentParser(description='Download, convert and save data from Lightlog device. Without arguments data will be saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if the log file already exists, new data will be appended to the log.')
 
     parser.add_argument("-p", "--port",
                         help="serial or COM port name")
@@ -119,7 +119,7 @@ def find_and_return_custom_cable():
 
 def parse_status_header(status):
     """\
-    Extract data from Light Log status header, returning a dictionary.
+    Extract data from Lightlog status header, returning a dictionary.
     """
     status_list = [i.split(':') for i in status.split(';')]
     status_dict = dict(zip([i[0] for i in status_list], [i[1] for i in status_list]))
@@ -193,7 +193,7 @@ def linear_interpolation(x, HW):
 
 def download_data_from_lightlog(ser, args):
     """\
-    Download data from serial connection with Light Log.
+    Download data from serial connection with Lightlog.
     """
     wait_time = 10
     timer = time.time()
@@ -250,7 +250,7 @@ def download_data_from_lightlog(ser, args):
                         ser.write('c' + minute_asci) # c = download
                         expect_data = True
                     communication_phase = 1
-                    sys.stdout.write('Communicating with Light Log.')
+                    sys.stdout.write('Communicating with Lightlog.')
                     sys.stdout.flush()
                     # Grab current time now
                     seconds_now = int((datetime.datetime.now() -
@@ -446,7 +446,7 @@ def append_data_to_end_of_file(data_rows, args, status_dict):
     f.close()
 
     print >> sys.stderr, "Appended", count_rows,
-    print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+    print >> sys.stderr, "samples to %s from Lightlog ID %s." % (args.file, status_dict['ID'])
 
 
 def write_data_to_new_file(data_rows, args, status_dict):
@@ -463,7 +463,7 @@ def write_data_to_new_file(data_rows, args, status_dict):
     f.close()
 
     print >> sys.stderr, "Wrote", len(data_rows),
-    print >> sys.stderr, "samples to %s from Light Log ID %s." % (args.file, status_dict['ID'])
+    print >> sys.stderr, "samples to %s from Lightlog ID %s." % (args.file, status_dict['ID'])
 
 
 def output_data_to_stdout(data_rows, args, status_dict):
@@ -477,7 +477,7 @@ def output_data_to_stdout(data_rows, args, status_dict):
         print "%s,%s,%s,%s,%s,%s" % (row[0], row[1], row[2], row[3], row[4], row[5])
 
     print >> sys.stderr, "Downloaded", len(data_rows),
-    print >> sys.stderr, "samples from Light Log ID %s." % (status_dict['ID'])
+    print >> sys.stderr, "samples from Lightlog ID %s." % (status_dict['ID'])
 
 
 def main():
@@ -503,7 +503,7 @@ def main():
             pass
 
         else:
-            print >> sys.stderr, "Trying %s (press Light Log button)." % port
+            print >> sys.stderr, "Trying %s (press Lightlog button)." % port
             data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
@@ -553,7 +553,7 @@ def main():
         print >> sys.stderr, "Status:", status_dict
 
     elif expect_data:
-        print >> sys.stderr, "Failed to communicate with Light Log."
+        print >> sys.stderr, "Failed to communicate with Lightlog."
         sys.exit(1)
 
 if __name__ == '__main__':
