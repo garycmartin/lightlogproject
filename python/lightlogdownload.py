@@ -378,6 +378,11 @@ def extract_data(data, args, seconds_now, status_dict):
             
         seconds += STEP_SECONDS
 
+    # Check if using stdout (no old data file to check for)
+    if args.file is None:
+        return data_rows
+
+    # Try to use previous data to accurately sample time deltas
     try:
         f = open(args.file, "rb")
     except IOError:
