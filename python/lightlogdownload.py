@@ -184,7 +184,7 @@ def parse_status_header(status):
     status_dict['Batt'] = int(status_dict['Batt'][:-2])
 
     # Convert relavent strings to int
-    for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW',
+    for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW', 'Delay',
               'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', 'Period',
               '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
         if i in status_dict:
