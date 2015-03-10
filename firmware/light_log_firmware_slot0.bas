@@ -323,6 +323,7 @@ delay_2sec:
     high EEPROM_POWER
     return
 
+
 read_RGBW_sensors:
     ; Enable TCS34725FN light sensor
     high SENSOR_POWER
@@ -415,6 +416,7 @@ bit_compress:
 	tmp_word = tmp_word / 16 + tmp_word ; scale to 0-1023 (1018) 10bit range per chanel
 	return
 
+
 bit_compress_16x:
 	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
     if tmp_word < 128 then
@@ -439,6 +441,7 @@ bit_compress_16x:
         tmp_word = tmp_word / 512 + 576
     endif
     return
+
 
 bit_compress_1x:
 	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
@@ -466,6 +469,7 @@ bit_compress_1x:
         tmp_word = tmp_word / 512 + 832
     endif
 	return
+
 
 check_user_button:
     if EVENT_BUTTON = 0 then
@@ -543,6 +547,7 @@ check_user_button:
 
     return
 
+
 flash_led:
     ; Simple LED sequence flash
 	high LED5
@@ -561,6 +566,7 @@ flash_led:
 	pause 8
 	low LED1
     return
+
 
 check_serial_comms:
     gosub comms_speed
@@ -607,6 +613,7 @@ calibrate_2_5Klux:
     write REGISTER_2_5KLUX_WHITE_WORD, word white
     return
 
+
 calibrate_5Klux:
     write REGISTER_5KLUX_RED_WORD, word red
     write REGISTER_5KLUX_GREEN_WORD, word green
@@ -614,12 +621,14 @@ calibrate_5Klux:
     write REGISTER_5KLUX_WHITE_WORD, word white
     return
 
+
 calibrate_10Klux:
     write REGISTER_10KLUX_RED_WORD, word red
     write REGISTER_10KLUX_GREEN_WORD, word green
     write REGISTER_10KLUX_BLUE_WORD, word blue
     write REGISTER_10KLUX_WHITE_WORD, word white
     return
+
 
 header_block:
     read REGISTER_UNIQUE_HW_ID_WORD1, word tmp2_word
@@ -698,6 +707,7 @@ dump_data:
     sertxd("data_eof")
     return
 
+
 dump_up_to_index:
     read REGISTER_LAST_SAVE_WORD, word tmp_word
     if tmp_word != 0 then
@@ -710,6 +720,7 @@ dump_up_to_index:
     next tmp2_word
     return
 
+
 dump_from_index_to_end:
     read REGISTER_LAST_SAVE_WORD, word tmp_word
     if tmp_word != 0 then
@@ -721,6 +732,7 @@ dump_from_index_to_end:
         sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
     next tmp2_word
     return
+
 
 reset_pointer:
     ; Reset pointers back to start of mem
@@ -756,9 +768,11 @@ first_boot_init:
     write REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
     return
 
+
 zero_light_goal:
     write REGISTER_LIGHT_GOAL_WORD, 0, 0
     return
+
 
 default_light_calibration:
     ; Default calibration using full spectrum white light measured at room temp.
@@ -769,17 +783,20 @@ default_light_calibration:
 	next tmp_low_byte
     return
 
+
 comms_speed:
     ; 19200 comms to save power during sync
     setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     hi2csetup i2cmaster, EEPROM_24LC512, i2cfast_16, i2cword
     return
 
+
 normal_speed:
     ; Sensor read and average i2c write loop
     setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     hi2csetup i2cmaster, EEPROM_24LC512, i2cfast, i2cword
     return
+
 
 low_speed:
     ; Simulate low power sleep
