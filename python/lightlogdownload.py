@@ -251,6 +251,7 @@ def download_data_from_lightlog(ser, args):
     data = ''
     seconds_now = None
     expect_data = True
+    minute_since_midnight = None
 
     while True:
         time.sleep(0.001) # free up some cpu
@@ -316,23 +317,24 @@ def download_data_from_lightlog(ser, args):
     if communication_phase == 1:
         print >> sys.stderr
 
-    return data, seconds_now, expect_data
+    return data, seconds_now, minute_since_midnight, expect_data
 
 
-def get_minute_day_phase_asci():
+def get_minute_day_phase():
     """\
-    Return low and high asci bytes for todays minutes (used to sync phase).
+    Return todays minutes (used to sync phase).
     """
     now = datetime.datetime.now()
     # TODO: Make this a 4am reset point by default
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     minute_since_midnight = int(round((now - midnight).total_seconds() / 60.0))
-    minute_low_byte = minute_since_midnight & 0xFF
-    minute_high_byte = minute_since_midnight >>8 & 0xFF
+    return minute_since_midnight
 
-    print >> sys.stderr, 'Systems day phase %dmin' % minute_since_midnight
 
-    return chr(minute_low_byte) + chr(minute_high_byte)
+def bytes_from_int(value):
+    value_low_byte = value & 0xFF
+    value_high_byte = value >>8 & 0xFF
+    return chr(value_low_byte) + chr(value_high_byte)
 
 
 def extract_data(data, args, seconds_now, status_dict):
@@ -480,9 +482,11 @@ def store_data_to_file(data_rows, args, status_dict):
         f = open(args.file, "rb")
     except IOError:
         # File does not exist, creating a new file
-        write_data_to_new_file(data_rows, args, status_dict)
+        samples_stored = write_data_to_new_file(data_rows, args, status_dict)
     else:
-        append_data_to_end_of_file(data_rows, args, status_dict)
+        samples_stored = append_data_to_end_of_file(data_rows, args, status_dict)
+
+    return samples_stored
 
 
 def append_data_to_end_of_file(data_rows, args, status_dict):
@@ -499,6 +503,7 @@ def append_data_to_end_of_file(data_rows, args, status_dict):
 
     print >> sys.stderr, "Appended", count_rows,
     print >> sys.stderr, "samples to %s from Lightlog ID %s." % (args.file, status_dict['ID'])
+    return count_rows
 
 
 def write_data_to_new_file(data_rows, args, status_dict):
@@ -516,6 +521,7 @@ def write_data_to_new_file(data_rows, args, status_dict):
 
     print >> sys.stderr, "Wrote", len(data_rows),
     print >> sys.stderr, "samples to %s from Lightlog ID %s." % (args.file, status_dict['ID'])
+    return len(data_rows)
 
 
 def output_data_to_stdout(data_rows, args, status_dict):
@@ -556,7 +562,7 @@ def main():
 
         else:
             print >> sys.stderr, "Trying %s (press Lightlog button)." % port
-            data, seconds_now, expect_data = download_data_from_lightlog(ser, args)
+            data, seconds_now, minute_since_midnight, expect_data = download_data_from_lightlog(ser, args)
             ser.close()
             if len(data) > 0 or not expect_data:
                 break
@@ -576,25 +582,40 @@ def main():
                     args.raw = True
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
                     data_rows = extract_data(data, args, seconds_now, status_dict)
-                    store_data_to_file(data_rows, args, status_dict)
+                    samples_stored = store_data_to_file(data_rows, args, status_dict)
                     args.raw = None
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
                     data_rows = extract_data(data, args, seconds_now, status_dict)
-                    store_data_to_file(data_rows, args, status_dict)
+                    samples_stored = store_data_to_file(data_rows, args, status_dict)
 
                 elif args.raw:
                     args.file = 'Light_Log_%s_raw.csv' % (status_dict['ID'])
                     data_rows = extract_data(data, args, seconds_now, status_dict)
-                    store_data_to_file(data_rows, args, status_dict)
+                    samples_stored = store_data_to_file(data_rows, args, status_dict)
 
                 else:
                     args.file = 'Light_Log_%s.csv' % (status_dict['ID'])
                     data_rows = extract_data(data, args, seconds_now, status_dict)
-                    store_data_to_file(data_rows, args, status_dict)
+                    samples_stored = store_data_to_file(data_rows, args, status_dict)
 
             else:
                 data_rows = extract_data(data, args, seconds_now, status_dict)
-                store_data_to_file(data_rows, args, status_dict)
+                samples_stored = store_data_to_file(data_rows, args, status_dict)
+                
+            print >> sys.stderr, 'Device day phase was %dmin, now set to %dmin' % (status_dict['Phase'], minute_since_midnight)
+            if samples_stored > 0:
+                if 'Delay' in status_dict:
+                    device_delay = status_dict['Delay']
+                else:
+                    device_delay = 1000
+                time_difference = minute_since_midnight - status_dict['Phase']
+                # Correct only up to 12 hours drift & deal with midnight edge case
+                if time_difference < -720:
+                    time_difference += 1440
+                elif time_difference > 720:
+                    time_difference -= 1440
+                ideal_delay = (samples_stored / float(time_difference + samples_stored)) * device_delay
+                print >> sys.stderr, 'Device delay tuning is set to %d (%d suggested)' % (device_delay, int(round(ideal_delay)))
 
         print >> sys.stderr, "Battery %dmV" % (status_dict['Batt'])
 
