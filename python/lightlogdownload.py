@@ -48,7 +48,7 @@ from serial.tools import list_ports
 #SERIAL_BAUD = 38400
 SERIAL_BAUD = 19200
 STEP_SECONDS = 60 # default grab from status 'Period' if available
-VERSION = 'v0.12'
+VERSION = 'v0.13'
 
 
 def limit(value, low, high):
