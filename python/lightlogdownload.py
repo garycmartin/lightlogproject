@@ -50,6 +50,31 @@ SERIAL_BAUD = 19200
 STEP_SECONDS = 60 # default grab from status 'Period' if available
 VERSION = 'v0.12'
 
+
+def limit(value, low, high):
+    if value > high or value < low:
+        raise argparse.ArgumentTypeError("value should be in range %d-%d" %(low, high))
+    return value
+
+
+def phase_limit(string):
+    value = int(string)
+    limit(value, 0, 1440)
+    return value
+
+
+def delay_limit(string):
+    value = int(string)
+    limit(value, 500, 2000)
+    return value
+
+
+def sample_limit(string):
+    value = int(string)
+    limit(value, 1, 64)
+    return value
+
+
 def get_args():
     """\
     Parse and return command line arguments.
@@ -65,24 +90,48 @@ def get_args():
                         help="auto saves two files, raw 10-bit sensor data and one in lux",
                         action="store_true")
     parser.add_argument("--csv-header",
-                        help="outputs column header in first row of data",
-                        action="store_true")
-    parser.add_argument("-v", "--version",
-                        help="show download software version number and exit",
+                        help="outputs column header in first row of data (new log files only)",
                         action="store_true")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-f", "--file",
                        help="save downloaded data to a named file")
     group.add_argument("--stdout",
-                       help="send data to console std out",
+                       help="send data to console sandard output",
                        action="store_true")
-    group.add_argument("--cmd",
-                       help="device command: a=display device status data; e=reset memory pointer (for a fresh logging session); f=zero reboot counter (for hardware debugging); l=zero daily light goal; m=zero day phase (define now as peak sleep point); n=half day phase (define + 12hrs as peak sleep point); z=trigger device first boot init (!!!).",
-                       choices=['a', 'e', 'f', 'l', 'm', 'n', 'z'])
     group.add_argument("--cal",
-                       help="calibrate hardware to known lux light sources",
+                       help="calibrate hardware to current lux light exposure",
                        choices=['2.5k', '5k', '10k'])
+    group.add_argument("--delay",
+                       help="fine tune device delay timing between samples 500-2000 (default 1000 = 10sec)",
+                       action="store",
+                       type=delay_limit)
+    group.add_argument("--phase",
+                       help="set day phase 0-1439 in min (used for resetting daily goal)",
+                       action="store",
+                       type=phase_limit)
+    group.add_argument("--sample",
+                       help="number of samples per average 1-63 (default is 6 giving 1 record every minute)",
+                       action="store",
+                       type=sample_limit)
+    group.add_argument("--status", "-s",
+                       help="display device status data",
+                       action="store_true")
+    group.add_argument("--reset-memory",
+                       help="reset memory pointer (for a fresh logging session)",
+                       action="store_true")
+    group.add_argument("--reset-cal",
+                       help="reset lux calibration back to factory defaults",
+                       action="store_true")
+    group.add_argument("--reset-goal",
+                       help="reset daily light goal",
+                       action="store_true")
+    group.add_argument("--factory-reset",
+                       help="reset device back to all factory defaults, new unique hardware ID will be generated (!!!)",
+                       action="store_true")
+    group.add_argument("-v", "--version",
+                       help="show download software version number and exit",
+                       action="store_true")
 
     if parser.parse_args().version:
         print >> sys.stderr, "Version", VERSION
@@ -222,29 +271,32 @@ def download_data_from_lightlog(ser, args):
             if data[-6:] == 'Hello?':
                 data = ''
                 expect_data = False
-                minute_asci = get_minute_day_phase_asci()
+                minute_since_midnight = get_minute_day_phase()
+                minute_asci = bytes_from_int(minute_since_midnight)
 
                 if communication_phase == 0:
-                    if args.cmd == 'a':
+                    if args.status:
                         ser.write('a' + minute_asci) # a = request status output
                         expect_data = True
-                    elif args.cmd == 'e':
+                    elif args.reset_memory:
                         ser.write('e' + minute_asci) # e = reset mem pointer!
-                    elif args.cmd == 'f':
-                        ser.write('f' + minute_asci) # f = reset reboot counter
                     elif args.cal == '2.5k':
                         ser.write('h' + minute_asci) # h = calibrate to 2.5K lux source!!
                     elif args.cal == '5k':
                         ser.write('i' + minute_asci) # i = calibrate to 5K lux source!!
                     elif args.cal == '10k':
                         ser.write('j' + minute_asci) # j = calibrate to 10K lux source!!
-                    elif args.cmd == 'l':
+                    elif args.reset_cal:
+                        ser.write('k' + minute_asci) # k = rest to factory lux calibration
+                    elif args.reset_goal:
                         ser.write('l' + minute_asci) # l = zero light goal
-                    elif args.cmd == 'm':
-                        ser.write('m' + minute_asci) # m = zero day phase (peak sleep point)
-                    elif args.cmd == 'n':
-                        ser.write('n' + minute_asci) # n = half day phase (peak sleep point + 50%)
-                    elif args.cmd == 'z':
+                    elif args.delay:
+                        ser.write('d' + bytes_from_int(args.delay)) # d = set custom time delay
+                    elif args.phase:
+                        ser.write('p' + bytes_from_int(args.phase)) # p = set day phase
+                    elif args.sample:
+                        ser.write('s' + bytes_from_int(args.sample)) # s = set day phase
+                    elif args.factory_reset:
                         ser.write('z' + minute_asci) # z = first boot init
                     else:
                         ser.write('c' + minute_asci) # c = download
