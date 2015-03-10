@@ -189,8 +189,6 @@ def parse_status_header(status):
               '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
         if i in status_dict:
             status_dict[i] = int(status_dict[i])
-            
-    print >> sys.stderr, 'Device old day phase %dmin' % status_dict['Phase']
 
     return status_dict
 
