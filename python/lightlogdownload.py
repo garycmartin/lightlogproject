@@ -363,6 +363,12 @@ def extract_data(data, args, seconds_now, status_dict):
         # 10 = button press
         # 00 = OK
 
+        if status_dict['FW'] >= 21:
+            # Colour switched to 10-bit (0-1023) as percentage of white value
+            r = int(round(w * (r / 1023.0)))
+            g = int(round(w * (g / 1023.0)))
+            b = int(round(w * (b / 1023.0)))
+
         # Raw sensor data
         if args.raw:
             # Raw sensor data
