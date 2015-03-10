@@ -585,7 +585,7 @@ def main():
         # Strip off status head from data
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
-
+        
         if args.stdout:
             data_rows = extract_data(data, args, seconds_now, status_dict)
             output_data_to_stdout(data_rows, args, status_dict)
