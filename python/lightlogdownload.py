@@ -617,7 +617,9 @@ def main():
                 samples_stored = store_data_to_file(data_rows, args, status_dict)
                 
             print >> sys.stderr, 'Device day phase was %dmin, now set to %dmin' % (status_dict['Phase'], minute_since_midnight)
-            if samples_stored > 0:
+
+            # Calculate suggested delay tuning if we have a reasonable number of samples
+            if samples_stored > 120:
                 if 'Delay' in status_dict:
                     device_delay = status_dict['Delay']
                 else:
