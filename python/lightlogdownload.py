@@ -221,12 +221,17 @@ def linear_interpolation(x, HW):
     """\
     Linear interpolation between recorded data point values from HW4 digital sensor devices.
     """
-    if HW == 4:
+    if HW == 5:
+        # SMT digital sensor in white case with larger sensor window
+        calibration_data = [(0, 0), (1, 39), (8, 193), (50, 389), (100, 461), (250, 521), (500, 605), (1000, 673), (2500, 762), (5000, 819), (10000, 854), (15000, 880), (33000, 983), (60000, 1023)]
+
+    elif HW == 4:
         # SMT digital sensor
         calibration_data = [(0, 0), (1, 29), (8, 175), (20, 258), (40, 321), (140, 446), (500, 572), (1000, 632), (1500, 658), (2000, 716), (2500, 0x322), (5000, 0x35F), (10000, 0x3A2), (20000, 945), (27000, 953), (85000, 0x3FF)]
     else:
         # LDR prototypes
         calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
+    
     calibration_data.reverse()
     x = float(x)
     result = None
