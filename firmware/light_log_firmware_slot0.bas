@@ -170,6 +170,8 @@ endif
     symbol flag = b26
     symbol sample_loop = b27
 
+    symbol VAR_WHITE_ORIGINAL_WORD = 28
+
     ; First boot check
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
     if tmp_word != FIRST_BOOT_PASS_WORD then
@@ -313,19 +315,22 @@ read_RGBW_sensors:
         pause 51
     endif
 
-	gosub bit_compress
+    ; Remember uncompressed white for use in rgb deltas 
+    poke VAR_WHITE_ORIGINAL_WORD, word tmp_word
+
+    gosub bit_compress
     white = tmp_word
 
-	hi2cin TCS34725FN_RDATA, (tmp_low_byte, tmp_high_byte)
-	gosub bit_compress
+    hi2cin TCS34725FN_RDATA, (tmp_low_byte, tmp_high_byte)
+    gosub scale_into_10bits
     red = tmp_word
 
-	hi2cin TCS34725FN_GDATA, (tmp_low_byte, tmp_high_byte) 
-	gosub bit_compress
+    hi2cin TCS34725FN_GDATA, (tmp_low_byte, tmp_high_byte)
+    gosub scale_into_10bits
     green = tmp_word
 
-	hi2cin TCS34725FN_BDATA, (tmp_low_byte, tmp_high_byte)
-	gosub bit_compress
+    hi2cin TCS34725FN_BDATA, (tmp_low_byte, tmp_high_byte)
+    gosub scale_into_10bits
     blue = tmp_word
 
     ; Power off TCS34725FN light sensor
@@ -333,6 +338,41 @@ read_RGBW_sensors:
 
     ;sertxd("W", #white, ", R", #red, ", G", #green, ", B", #blue, 13)
     return
+
+
+scale_into_10bits:
+    ; Scale colour into a 10bit value based on white value as 100% (=1024)
+    ; WARNING: blue variable being used as a tmp variable here
+    blue = tmp_word
+    peek VAR_WHITE_ORIGINAL_WORD, word tmp_word
+
+    ; White should always be larger rgb colour...
+    if tmp_word < blue then
+        tmp_word = blue
+    endif
+
+    ; Make the best out of integer maths
+    if blue > 6553 then
+        tmp_word = tmp_word / 1023
+        tmp_word = blue / tmp_word
+    elseif blue > 655 then
+        tmp_word = tmp_word / 102
+        tmp_word = blue * 10 / tmp_word
+    elseif blue >= 66 then
+        tmp_word = tmp_word / 10
+        tmp_word = blue * 102 / tmp_word
+    elseif tmp_word > 0 then
+        tmp_word = blue * 1023 / tmp_word
+    else
+        tmp_word = 0
+    endif
+
+    ; Keep within 10bit range (int maths can exceed)
+    if tmp_word > 1023 then
+        tmp_word = 1023
+    endif
+    return
+
 
 bit_compress:
     ; Check flag for x16 vs x1 exposure gain
