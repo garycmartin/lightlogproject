@@ -432,7 +432,7 @@ check_user_button:
 			tmp2_high_byte = 48
 		endif
 
-		; Display bar graph for daily goal progress
+        ; Display bar graph animation for daily goal progress
         read REGISTER_LIGHT_GOAL_WORD, word tmp_word
         for tmp2_low_byte = 0 to 6
             high LED5
@@ -473,7 +473,6 @@ check_user_button:
     else
         write REGISTER_BUTTON_LATCHED_WORD, 0, 0
     endif
-
     return
 
 
@@ -533,7 +532,7 @@ check_serial_comms:
         gosub first_boot_init
     endselect
 
-    serial_checked:
+serial_checked:
     gosub normal_speed
     return
 
