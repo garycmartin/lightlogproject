@@ -54,15 +54,24 @@ table 15, (0x40, 0x01, 0x8D, 0x01, 0x27, 0x01, 0xFA, 0x02, _
            0x3A, 0x01, 0x8C, 0x01, 0x30, 0x01, 0x33, 0x03, _
            0x3E, 0x01, 0x8E, 0x01, 0x2B, 0x01, 0x56, 0x03)
 
-#no_data ; Make sure re-programming does not zap eeprom data memory
+#slot 0
+#no_data ; Make sure re-programming does not wipe eeprom data memory
 #picaxe 14m2
 
-init:
-    ; Save all the power we can
-    disablebod ; disable 1.9V brownout detector
-    disabletime ; Stop the time clock
-    disconnect ; Don't listen for re-programming
-    gosub normal_speed
+; Save all the power we can
+disablebod ; disable 1.9V brownout detector
+disabletime ; Stop the time clock
+disconnect ; Don't listen for re-programming
+gosub normal_speed
+
+; Don't trigger init code if returning from slot 1 program
+symbol REGISTER_CHECK_SLOT_1 = 55
+symbol tmp_low_byte = b16
+read REGISTER_CHECK_SLOT_1, tmp_low_byte
+if tmp_low_byte = 1 then
+    write REGISTER_CHECK_SLOT_1, 0
+    goto main
+endif
 
     symbol FIRMWARE_VERSION = 20
     symbol HARDWARE_VERSION = 4 ; SMT v0.6 Rev A
@@ -147,7 +156,7 @@ init:
     symbol blue_avg = w6
     symbol white_avg = w7
     symbol tmp_word = w8
-    symbol tmp_low_byte = b16
+    ;symbol tmp_low_byte = b16
     symbol tmp_high_byte = b17
     symbol tmp2_word = w9
     symbol tmp2_low_byte = b18
