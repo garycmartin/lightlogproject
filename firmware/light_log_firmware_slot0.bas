@@ -195,7 +195,6 @@ endif
     tmp_word = tmp_word + 1
     write REGISTER_REBOOT_COUNT_WORD, word tmp_word
 
-	gosub default_light_calibration ; Only do this if button held down at boot?
     gosub flash_led
 
     flag = FLAG_REBOOT
@@ -515,6 +514,9 @@ check_serial_comms:
 
         case "j"
         gosub calibrate_10Klux
+
+        case "k"
+        gosub default_light_calibration
 
         case "l"
         gosub zero_light_goal
