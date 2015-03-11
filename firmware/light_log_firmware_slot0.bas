@@ -423,13 +423,13 @@ check_user_button:
 		; Lead into bargraph
 		gosub flash_led
 
-		; Check if illumination is currently bright enough to count
-		read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
-		if white >= tmp_word then
-			tmp2_high_byte = 16
-		else
-			tmp2_high_byte = 48
-		endif
+        ; Check if illumination is currently bright enough to count to goal
+        read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
+        if white >= tmp_word then
+            tmp2_high_byte = 16
+        else
+            tmp2_high_byte = 48
+        endif
 
         ; Display bar graph animation for daily goal progress
         read REGISTER_LIGHT_GOAL_WORD, word tmp_word
