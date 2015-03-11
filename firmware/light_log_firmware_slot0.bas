@@ -192,7 +192,7 @@ endif
 
     ; Keep a count of device reboots
     read REGISTER_REBOOT_COUNT_WORD, word tmp_word
-    tmp_word = tmp_word + 1
+    inc tmp_word
     write REGISTER_REBOOT_COUNT_WORD, word tmp_word
 
     gosub flash_led
@@ -406,7 +406,7 @@ check_user_button:
         if tmp_word > 3 then
             return
         endif
-        tmp_word = tmp_word + 1
+        inc tmp_word
         write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
         gosub check_serial_comms
