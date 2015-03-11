@@ -73,8 +73,9 @@ if tmp_low_byte = 1 then
     goto main
 endif
 
-    symbol FIRMWARE_VERSION = 20
-    symbol HARDWARE_VERSION = 4 ; SMT v0.6 Rev A
+init:
+    symbol FIRMWARE_VERSION = 21
+    symbol HARDWARE_VERSION = 5 ; SMT v0.6 Rev A in case with larger sensor window
 
     symbol EEPROM_POWER = C.2
     symbol SENSOR_POWER = C.4
