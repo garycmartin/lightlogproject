@@ -82,6 +82,7 @@ init:
     ; 63 = max (due to word int maths and avg overflow risk)
     symbol SAMPLES_PER_AVERAGE = 6
     symbol SECONDS_PER_RECORD = SAMPLES_PER_AVERAGE * 10
+    symbol DEFAULT_2SEC_DELAY = 1000
 
     symbol FLAG_OK = %00000000
     symbol FLAG_REBOOT = %11000000
@@ -116,6 +117,7 @@ init:
     symbol REGISTER_MEMORY_WRAPPED_WORD = 51
     symbol REGISTER_BUTTON_LATCHED_WORD = 53
 
+    symbol REGISTER_DELAY_WORD = 56
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
     symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
@@ -162,6 +164,13 @@ init:
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
     if tmp_word != FIRST_BOOT_PASS_WORD then
         gosub first_boot_init
+    endif
+
+    ; Check delay is set to a reasonable value
+    read REGISTER_DELAY_WORD, word tmp_word
+    if tmp_word < 500 or tmp_word > 2000 then
+        tmp_word = DEFAULT_2SEC_DELAY
+        write REGISTER_DELAY_WORD, word tmp_word
     endif
 
     ; Keep a count of device reboots
@@ -308,8 +317,9 @@ delay_2sec:
     ; Delay for 2 sec without using the low power sleep watchdog timer 
     ; More accurate, avoids intermittent crashes, but uses more power
     low EEPROM_POWER
+    read REGISTER_DELAY_WORD, word tmp_word
     gosub low_speed
-    pauseus 977 ; my SMT serial Lightlog (4147A88F)
+    pauseus tmp_word
     gosub normal_speed
     high EEPROM_POWER
     return
@@ -580,12 +590,21 @@ check_serial_comms:
         case "l"
         gosub zero_light_goal
 
+        case "d"
+        gosub set_time_delay
+
         case "z"
         gosub first_boot_init
     endselect
 
     serial_checked:
     gosub normal_speed
+    return
+
+
+set_time_delay:
+    ; Used to fine tune device delay
+    write REGISTER_DELAY_WORD, word tmp_word
     return
 
 calibrate_2_5Klux:
@@ -655,6 +674,8 @@ header_block:
     sertxd("Goal:", #tmp2_word, ";")
     read REGISTER_DAY_PHASE_WORD, word tmp2_word
     sertxd("Phase:", #tmp2_word, ";")
+    read REGISTER_DELAY_WORD, word tmp2_word
+    sertxd("Delay:", #tmp2_word, ";")
     calibadc10 tmp2_word
     tmp2_word = 52378 / tmp2_word * 2
     sertxd("Batt:", #tmp2_word, "0mV", ";")
@@ -730,6 +751,8 @@ first_boot_init:
     gosub zero_light_goal
     write REGISTER_DAY_PHASE_WORD, 0, 0
     write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
+    tmp_word = DEFAULT_2SEC_DELAY
+    gosub set_time_delay
 
     ; Generate unique hardware id (seed from sensor and battery readings)
     gosub read_RGBW_sensors
