@@ -514,6 +514,9 @@ check_serial_comms:
         case "d"
         gosub set_time_delay
 
+        case "p"
+        gosub set_day_phase
+
         case "s"
         gosub set_samples_per_average
 
@@ -616,25 +619,25 @@ header_block:
     sertxd("head_eof")
     return
 
-update_time_and_phase:
-	; Update day phase (crude test to check the value is at least sane)
-    if tmp_word > 1440 then
-		; Do nothing, must be bad value
-		return
-	endif
-    read REGISTER_DAY_PHASE_WORD, word tmp2_word
-	; Try and estimate if daily accumulated goal should be reset
-	if tmp2_word > 1080 and tmp_word < 360 then
-	    write REGISTER_LIGHT_GOAL_WORD, 0, 0
-	endif
-    write REGISTER_DAY_PHASE_WORD, word tmp_word
-	return
+
+set_day_phase:
+    ; Update day phase (crude test to check the value is at least sane)
+    if tmp_word < 1440 then
+        read REGISTER_DAY_PHASE_WORD, word tmp2_word
+        ; Try and estimate if daily accumulated goal should be reset
+        if tmp2_word > 1080 and tmp_word < 360 then
+            gosub zero_light_goal
+        endif
+        write REGISTER_DAY_PHASE_WORD, word tmp_word
+    endif
+    return
+
 
 dump_data:
     ; Output data oldest to newest
     high EEPROM_POWER
     gosub header_block
-	gosub update_time_and_phase ; serial comms word passed via tmp_word
+    gosub set_day_phase ; serial comms word passed via tmp_word
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
     if tmp_word > 0 then
         ; Dump end block of memory first if memory has wrapped one or more times
