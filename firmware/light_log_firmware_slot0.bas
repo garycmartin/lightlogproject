@@ -80,8 +80,7 @@ init:
     pullup %0000100000000000
 
     ; 63 = max (due to word int maths and avg overflow risk)
-    symbol SAMPLES_PER_AVERAGE = 6
-    symbol SECONDS_PER_RECORD = SAMPLES_PER_AVERAGE * 10
+    symbol DEFAULT_SAMPLES_PER_AVERAGE = 6
     symbol DEFAULT_2SEC_DELAY = 1000
 
     symbol FLAG_OK = %00000000
@@ -118,6 +117,8 @@ init:
     symbol REGISTER_BUTTON_LATCHED_WORD = 53
 
     symbol REGISTER_DELAY_WORD = 56
+    symbol REGISTER_SAMPLES_PER_AVERAGE = 58
+
     symbol BYTES_PER_RECORD = 6
     symbol EEPROM_TOTAL_BYTES = 65536
     symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
@@ -173,6 +174,13 @@ init:
         write REGISTER_DELAY_WORD, word tmp_word
     endif
 
+    ; Check number of samples is set to a reasonable value
+    read REGISTER_SAMPLES_PER_AVERAGE, tmp_low_byte
+    if tmp_low_byte = 0 or tmp_low_byte > 64 then
+        tmp_low_byte = DEFAULT_SAMPLES_PER_AVERAGE
+        write REGISTER_SAMPLES_PER_AVERAGE, tmp_low_byte
+    endif
+
     ; Keep a count of device reboots
     read REGISTER_REBOOT_COUNT_WORD, word tmp_word
     tmp_word = tmp_word + 1
@@ -184,144 +192,57 @@ init:
     flag = FLAG_REBOOT
 
 main:
-    for sample_loop = 1 to SAMPLES_PER_AVERAGE
-        gosub read_RGBW_sensors
-        if sample_loop = 1 then
-            ; Pre-fill averages for first pass
-            red_avg = red
-            green_avg = green
-            blue_avg = blue
-            white_avg = white
-        else
-            ; Accumulate average data samples
-            red_avg = red + red_avg
-            green_avg = green + green_avg
-            blue_avg = blue + blue_avg
-            white_avg = white + white_avg
-        endif
+    low EEPROM_POWER
+    read REGISTER_SAMPLES_PER_AVERAGE, sample_loop
+    gosub low_energy_wait
+    gosub read_RGBW_sensors
 
-        gosub delay_2sec
-        gosub check_user_button
-        gosub delay_2sec
-        gosub check_user_button
-        gosub delay_2sec
-        gosub check_user_button
-        gosub delay_2sec
-        gosub check_user_button
-        gosub delay_2sec
-        gosub check_user_button
-    next sample_loop
+    ; Pre-fill averages for first pass
+    red_avg = red
+    green_avg = green
+    blue_avg = blue
+    white_avg = white
 
-    ; Calculate averages
-    red_avg = red_avg / SAMPLES_PER_AVERAGE
-    green_avg = green_avg / SAMPLES_PER_AVERAGE
-    blue_avg = blue_avg / SAMPLES_PER_AVERAGE
-    white_avg = white_avg / SAMPLES_PER_AVERAGE
+main_loop:
+    gosub low_energy_wait
+    gosub read_RGBW_sensors
 
-    ; Accumulate light for goal target
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
-    read REGISTER_5KLUX_WHITE_WORD, word tmp2_word
-    if white_avg >= tmp_word and white_avg < tmp2_word then
-        tmp2_word = tmp2_word - tmp_word ; 5K - 2.5K calibration delta
-        tmp2_word = 500 / tmp2_word ; scale factor for one sensor unit
-        tmp_word = white_avg - tmp_word * tmp2_word + 500; goal points between 500 and 1,000
-        goto goal_update
+    ; Accumulate average data samples
+    red_avg = red + red_avg
+    green_avg = green + green_avg
+    blue_avg = blue + blue_avg
+    white_avg = white + white_avg
+
+    dec sample_loop
+    if sample_loop > 1 then
+        goto main_loop
     endif
 
-    read REGISTER_10KLUX_WHITE_WORD, word tmp_word
-    if white_avg >= tmp2_word and white_avg < tmp_word then
-        tmp_word = tmp_word - tmp2_word ; 10K - 5K calibration delta
-        tmp_word = 1000 / tmp_word ; scale factor for one sensor unit
-        tmp_word = white_avg - tmp2_word * tmp_word + 1000; goal points between 1,000 and 2,000
-        goto goal_update
-    endif
+    write REGISTER_CHECK_SLOT_1, 2
+    run 1
 
-	; Check for brighter than 10K lux max score
-    if white_avg >= tmp_word then
-        tmp_word = 2000 ; maximum 2,000 points per min
-	else
-        goto end_goal_update
-    endif
 
-	goal_update:
-		; Update the goal units reached so far into memory
-    	read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
-    	tmp2_word = tmp2_word + tmp_word
-    	if tmp2_word > 60000 then
-    	    tmp2_word = 60000
-    	endif
-    	write REGISTER_LIGHT_GOAL_WORD, word tmp2_word
+low_energy_wait:
+    gosub delay_2sec
+    gosub check_user_button
+    gosub delay_2sec
+    gosub check_user_button
+    gosub delay_2sec
+    gosub check_user_button
+    gosub delay_2sec
+    gosub check_user_button
+    gosub delay_2sec
+    gosub check_user_button
+    return
 
-	end_goal_update:
-
-    ; Keep track of day phase cycle
-    read REGISTER_DAY_PHASE_WORD, word tmp_word
-    tmp_word = tmp_word + 1
-    if tmp_word > 1440 then
-        ; Reset goal and counter cycle every 1440 min
-        write REGISTER_LIGHT_GOAL_WORD, 0, 0
-        tmp_word = 0
-    endif
-    write REGISTER_DAY_PHASE_WORD, word tmp_word
-
-    ; Prepair to write data to eprom
-    read REGISTER_LAST_SAVE_WORD, word tmp_word
-
-    ; Store least significant bytes
-    red_byte = red_avg     & %11111111
-    hi2cout tmp_word, (red_byte)
-    tmp_word = tmp_word + 1
-
-    green_byte = green_avg & %11111111
-    hi2cout tmp_word, (green_byte)
-    tmp_word = tmp_word + 1
-
-    blue_byte = blue_avg   & %11111111
-    hi2cout tmp_word, (blue_byte)
-    tmp_word = tmp_word + 1
-
-    white_byte = white_avg & %11111111
-    hi2cout tmp_word, (white_byte)
-    tmp_word = tmp_word + 1
-
-    ; Fill extra_byte with 9th and 10th bits of each RGBT
-    extra_byte = red_avg   & %1100000000 / 256
-    extra_byte = green_avg & %1100000000 / 64 + extra_byte
-    extra_byte = blue_avg  & %1100000000 / 16 + extra_byte
-    extra_byte = white_avg & %1100000000 / 4  + extra_byte
-
-    hi2cout tmp_word, (extra_byte)
-    tmp_word = tmp_word + 1
-
-    hi2cout tmp_word, (flag)
-    tmp_word = tmp_word + 1
-
-    flag = FLAG_OK ; Clear any flag states
-
-    ; Increment and write current position to micro eprom
-    if tmp_word >= LAST_VALID_RECORD then
-        write REGISTER_LAST_SAVE_WORD, 0, 0
-
-        ; Keep track of memory wrapps
-        read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
-        tmp_word = tmp_word + 1
-        write REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
-
-    else
-        write REGISTER_LAST_SAVE_WORD, word tmp_word
-    endif
-
-    goto main
 
 delay_2sec:
     ; Delay for 2 sec without using the low power sleep watchdog timer 
     ; More accurate, avoids intermittent crashes, but uses more power
-    low EEPROM_POWER
     read REGISTER_DELAY_WORD, word tmp_word
     gosub low_speed
     pauseus tmp_word
     gosub normal_speed
-    high EEPROM_POWER
     return
 
 
@@ -593,6 +514,9 @@ check_serial_comms:
         case "d"
         gosub set_time_delay
 
+        case "s"
+        gosub set_samples_per_average
+
         case "z"
         gosub first_boot_init
     endselect
@@ -606,6 +530,13 @@ set_time_delay:
     ; Used to fine tune device delay
     write REGISTER_DELAY_WORD, word tmp_word
     return
+
+
+set_samples_per_average:
+    ; 1 sample every 10 sec, defaults to 6 samples per average = 1 per min
+    write REGISTER_SAMPLES_PER_AVERAGE, tmp_low_byte
+    return
+
 
 calibrate_2_5Klux:
     write REGISTER_2_5KLUX_RED_WORD, word red
@@ -645,7 +576,9 @@ header_block:
     sertxd("Pointer:", #tmp2_word, ";")
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp2_word
     sertxd("Wrap:", #tmp2_word, ";")
-    sertxd("Period:", #SECONDS_PER_RECORD, ";")
+    read REGISTER_SAMPLES_PER_AVERAGE, tmp2_low_byte
+    tmp2_word = tmp2_low_byte * 10
+    sertxd("Period:", #tmp2_word, ";")
     read REGISTER_2_5KLUX_RED_WORD, word tmp2_word
     sertxd("2.5KluxR:", #tmp2_word, ";")
     read REGISTER_2_5KLUX_GREEN_WORD, word tmp2_word
@@ -699,6 +632,7 @@ update_time_and_phase:
 
 dump_data:
     ; Output data oldest to newest
+    high EEPROM_POWER
     gosub header_block
 	gosub update_time_and_phase ; serial comms word passed via tmp_word
     read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
@@ -707,6 +641,7 @@ dump_data:
         gosub dump_from_index_to_end
     endif
     gosub dump_up_to_index
+    low EEPROM_POWER
     sertxd("data_eof")
     return
 
@@ -753,6 +688,8 @@ first_boot_init:
     write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
     tmp_word = DEFAULT_2SEC_DELAY
     gosub set_time_delay
+    tmp_low_byte = DEFAULT_SAMPLES_PER_AVERAGE
+    gosub set_samples_per_average
 
     ; Generate unique hardware id (seed from sensor and battery readings)
     gosub read_RGBW_sensors
