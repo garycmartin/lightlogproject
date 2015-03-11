@@ -568,9 +568,6 @@ check_serial_comms:
         case "e"
         gosub reset_pointer
 
-        case "f"
-        gosub reset_reboot_counter
-
         case "h"
         gosub calibrate_2_5Klux
 
@@ -725,15 +722,11 @@ reset_pointer:
     write REGISTER_MEMORY_WRAPPED_WORD, 0, 0
     return
 
-reset_reboot_counter:
-    ; Reset reboot counter back to 0
-    write REGISTER_REBOOT_COUNT_WORD, 0, 0 
-    return
 
 first_boot_init:
     gosub default_light_calibration
     gosub reset_pointer
-    gosub reset_reboot_counter
+    write REGISTER_REBOOT_COUNT_WORD, 0, 0
     gosub zero_light_goal
     write REGISTER_DAY_PHASE_WORD, 0, 0
     write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
