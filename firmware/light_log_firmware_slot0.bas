@@ -449,19 +449,20 @@ check_user_button:
         inc tmp_word
         write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
+
+        ; User feedback based on light goal
+        gosub read_RGBW_sensors
+
         gosub check_serial_comms
 
         ; Allow program upload during a button press
         reconnect
 
-        ; User feedback based on light goal
-        gosub read_RGBW_sensors
+        ; Lead into bargraph
+        gosub flash_led
 
         ; Prevent program upload (saves power)
         disconnect
-
-		; Lead into bargraph
-		gosub flash_led
 
         ; Check if illumination is currently bright enough to count to goal
         read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
