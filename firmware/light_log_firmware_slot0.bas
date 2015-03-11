@@ -539,21 +539,17 @@ check_user_button:
 
 flash_led:
     ; Simple LED sequence flash
-	high LED5
-	pause 8
-	low LED5
-	high LED4
-	pause 8
-	low LED4
-	high LED3
-	pause 8
-	low LED3
-	high LED2
-	pause 8
-	low LED2
-	high LED1
-	pause 8
-	low LED1
+    high LED5
+    pause 8
+    toggle LED5, LED4
+    pause 8
+    toggle LED4, LED3
+    pause 8
+    toggle LED3, LED2
+    pause 8
+    toggle LED2, LED1
+    pause 8
+    low LED1
     return
 
 
