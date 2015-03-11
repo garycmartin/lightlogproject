@@ -464,6 +464,9 @@ check_user_button:
             if tmp_word < 60000 then
                 low LED1
             endif
+            if tmp_word = 60000 then
+                low LED1, LED2, LED3, LED4, LED5
+            endif
             pause tmp2_high_byte
 
         next tmp2_low_byte
