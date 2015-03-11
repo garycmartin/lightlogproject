@@ -36,14 +36,13 @@ POSSIBILITY OF SUCH DAMAGE.
                                   –––––
                                   _____
                              +V -|1 ^14|- 0V
-               In/Serial In C.5 -|2  13|- B.0 Serial Out/Out/hserout/DAC
+                  Serial In C.5 -|2  13|- B.0 Serial Out
                SENSOR_POWER C.4 -|3  12|- B.1 LED5
                EVENT_BUTTON C.3 -|4  11|- B.2 LED4
                EEPROM_POWER C.2 -|5  10|- B.3 hi2c scl
                        LED1 C.1 -|6   9|- B.4 hi2c sda
                        LED2 C.0 -|7   8|- B.5 LED3
                                   –––––
-
 #endrem
 
 ; Lux calibration table (copied into data memory on first boot or factory reset)
@@ -98,7 +97,7 @@ init:
     symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
     symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
 
-	; Populated by table at address 15 on first boot
+    ; Populated by table at address 15 on first boot
     symbol REGISTER_2_5KLUX_RED_WORD = 15
     symbol REGISTER_2_5KLUX_GREEN_WORD = 17
     symbol REGISTER_2_5KLUX_BLUE_WORD = 19
@@ -125,16 +124,16 @@ init:
     symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
     symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
 
-	symbol TCS34725FN = %01010010
-	symbol TCS34725FN_ID = %10110010
-	symbol TCS34725FN_ATIME = %10100001
-	symbol TCS34725FN_AGAIN = %10101111
-	symbol TCS34725FN_ENABLE = %10100000
-	symbol TCS34725FN_CDATA = %10110100
-	symbol TCS34725FN_RDATA = %10110110
-	symbol TCS34725FN_GDATA = %10111000
-	symbol TCS34725FN_BDATA = %10111010
-	symbol EEPROM_24LC512 = %10100000
+    symbol TCS34725FN = %01010010
+    symbol TCS34725FN_ID = %10110010
+    symbol TCS34725FN_ATIME = %10100001
+    symbol TCS34725FN_AGAIN = %10101111
+    symbol TCS34725FN_ENABLE = %10100000
+    symbol TCS34725FN_CDATA = %10110100
+    symbol TCS34725FN_RDATA = %10110110
+    symbol TCS34725FN_GDATA = %10111000
+    symbol TCS34725FN_BDATA = %10111010
+    symbol EEPROM_24LC512 = %10100000
 
     symbol red = w0
     symbol green = w1
@@ -311,14 +310,6 @@ delay_2sec:
     low EEPROM_POWER
     gosub low_speed
     pauseus 977 ; my SMT serial Lightlog (4147A88F)
-    ;pauseus 959 ; SMT serial Lightlog shipped to Martin (C2C1AF83)
-    ;pauseus 1227 ; use mean value for testing (large through hole)
-    ;pauseus 1389 ; my daily worn white test unit (large through hole)
-    ;pauseus 1380 ; white case with green sensor error (large through hole)
-    ;pauseus 1344 ; red case in livingroom window (large through hole)
-    ;pauseus 1318 ; red case on lamp in livingroom (large through hole)
-    ;pauseus 1286 ; blue case fridge (large through hole)
-    ;pauseus 1484 ; blue case bedroom window (large through hole)
     gosub normal_speed
     high EEPROM_POWER
     return
@@ -351,39 +342,37 @@ read_RGBW_sensors:
     ; 0x03=60x
     hi2cout TCS34725FN_AGAIN, (0x02)
 
-	tmp2_low_byte = 0 ; Flag to indicate overexposed sample
-	too_bright_retry_entry_point:
+    tmp2_low_byte = 0 ; Flag to indicate overexposed sample
+    too_bright_retry_entry_point:
 
     pause 3
 
-	; ENABLE - PON power on internal oscillator
-	hi2cout TCS34725FN_ENABLE, (%00000001)
-	pause 4; Min of 2.4ms before enabling RGBC
+    ; ENABLE - PON power on internal oscillator
+    hi2cout TCS34725FN_ENABLE, (%00000001)
+    pause 4; Min of 2.4ms before enabling RGBC
 
-	; ENABLE - AEN, start RGBC ADC (and leave power ON)
-	hi2cout TCS34725FN_ENABLE, (%00000011)
+    ; ENABLE - AEN, start RGBC ADC (and leave power ON)
+    hi2cout TCS34725FN_ENABLE, (%00000011)
 
-	; Wait ~intergration time before reading (should only need ~77ms for default, or so...)
-	; TODO: Move/refactor this delay to an existing natural delay (e.g. button waits?)
-	; <<<------ FIXME: currently messing up my log timing and stability no doubt...
-	pause 44
+    ; Wait ~intergration time before reading (should only need ~77ms for default, or so...)
+    ; TODO: Move/refactor this delay to an existing natural delay (e.g. button waits?)
+    ; <<<------ FIXME: currently messing up my log timing and stability no doubt...
+    pause 44
 
-	; Sleep once integration cycle completes
-	hi2cout TCS34725FN_ENABLE, (%00000001)
+    ; Sleep once integration cycle completes
+    hi2cout TCS34725FN_ENABLE, (%00000001)
 
-	hi2cin TCS34725FN_CDATA, (tmp_low_byte, tmp_high_byte)
+    hi2cin TCS34725FN_CDATA, (tmp_low_byte, tmp_high_byte)
 
-	; Check if overexposed
-	if tmp_word = 0xFFFF and tmp2_low_byte = 0 then
-	    ;sertxd(">", #tmp_word, ", ")
-		tmp2_low_byte = 1
-	    hi2cout TCS34725FN_AGAIN, (0x00)
-		goto too_bright_retry_entry_point
-	else
-		; correct timing if first sample was good
-	    ;sertxd("=", #tmp_word, ", ")
-		pause 51
-	endif
+    ; Check if overexposed
+    if tmp_word = 0xFFFF and tmp2_low_byte = 0 then
+        tmp2_low_byte = 1
+        hi2cout TCS34725FN_AGAIN, (0x00)
+        goto too_bright_retry_entry_point
+    else
+        ; correct timing if first sample was good
+        pause 51
+    endif
 
 	gosub bit_compress
     white = tmp_word
@@ -407,21 +396,21 @@ read_RGBW_sensors:
     return
 
 bit_compress:
-	; Check flag for x16 vs x1 exposure gain
-	if tmp2_low_byte = 1 then
-		gosub bit_compress_1x
-	else
-		gosub bit_compress_16x
-	endif
-	tmp_word = tmp_word / 16 + tmp_word ; scale to 0-1023 (1018) 10bit range per chanel
-	return
+    ; Check flag for x16 vs x1 exposure gain
+    if tmp2_low_byte = 1 then
+        gosub bit_compress_1x
+    else
+        gosub bit_compress_16x
+    endif
+    tmp_word = tmp_word / 16 + tmp_word ; scale to 0-1023 (1018) 10bit range per chanel
+    return
 
 
 bit_compress_16x:
-	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
+    ; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
     if tmp_word < 128 then
-		return
-	elseif tmp_word < 256 then
+        return
+    elseif tmp_word < 256 then
         tmp_word = tmp_word / 2 + 64
     elseif tmp_word < 512 then
         tmp_word = tmp_word / 4 + 128
@@ -444,7 +433,7 @@ bit_compress_16x:
 
 
 bit_compress_1x:
-	; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
+    ; Converts tmp_word to 10bit value (lossy 6bit significant, 4bit magnitude)
     if tmp_word < 64 then
         tmp_word = tmp_word * 4 ; special case?
     elseif tmp_word < 128 then
@@ -468,12 +457,12 @@ bit_compress_1x:
     else
         tmp_word = tmp_word / 512 + 832
     endif
-	return
+    return
 
 
 check_user_button:
     if EVENT_BUTTON = 0 then
-		; Check for button latch
+        ; Check for button latch
         read REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         if tmp_word > 3 then
             return
@@ -506,40 +495,40 @@ check_user_button:
 		; Display bar graph for daily goal progress
         read REGISTER_LIGHT_GOAL_WORD, word tmp_word
         for tmp2_low_byte = 0 to 6
-        	high LED5
-        	if tmp_word >= 12000 then
-				high LED4
-			endif
-        	if tmp_word >= 24000 then
-				high LED3
-			endif
-        	if tmp_word >= 36000 then
-				high LED2
-			endif
-        	if tmp_word >= 48000 then
-				high LED1
-			endif
-			pause tmp2_high_byte
+            high LED5
+            if tmp_word >= 12000 then
+                high LED4
+            endif
+            if tmp_word >= 24000 then
+                high LED3
+            endif
+            if tmp_word >= 36000 then
+                high LED2
+            endif
+            if tmp_word >= 48000 then
+                high LED1
+            endif
+            pause tmp2_high_byte
 
-   	     if tmp_word < 12000 then
-				low LED5
-			endif
-    	    if tmp_word < 24000 then
-				low LED4
-			endif
-    	    if tmp_word < 36000 then
-				low LED3
-			endif
-    	    if tmp_word < 48000 then
-				low LED2
-			endif
-    	    if tmp_word < 60000 then
-				low LED1
-			endif
-        	pause tmp2_high_byte
+            if tmp_word < 12000 then
+                low LED5
+            endif
+            if tmp_word < 24000 then
+                low LED4
+            endif
+            if tmp_word < 36000 then
+                low LED3
+            endif
+            if tmp_word < 48000 then
+                low LED2
+            endif
+            if tmp_word < 60000 then
+                low LED1
+            endif
+            pause tmp2_high_byte
 
         next tmp2_low_byte
-		low LED1, LED2, LED3, LED4, LED5
+        low LED1, LED2, LED3, LED4, LED5
 
     else
         write REGISTER_BUTTON_LATCHED_WORD, 0, 0
@@ -777,10 +766,10 @@ zero_light_goal:
 default_light_calibration:
     ; Default calibration using full spectrum white light measured at room temp.
     ; Copies table bytes into matching memory data address 15 onwards
-	for tmp_low_byte = 15 to 39
-		readtable tmp_low_byte, tmp_high_byte
-		write tmp_low_byte, tmp_high_byte
-	next tmp_low_byte
+    for tmp_low_byte = 15 to 39
+        readtable tmp_low_byte, tmp_high_byte
+        write tmp_low_byte, tmp_high_byte
+    next tmp_low_byte
     return
 
 
