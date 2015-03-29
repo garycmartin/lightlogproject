@@ -42,7 +42,7 @@ endif
 disablebod ; disable 1.9V brownout detector
 disabletime ; Stop the time clock
 disconnect ; Don't listen for re-programming
-gosub normal_speed
+setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
 init:
     symbol EEPROM_POWER = C.2
@@ -102,6 +102,7 @@ main:
     white_avg = white_avg / tmp_low_byte
 
     high EEPROM_POWER
+    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast, i2cword
 
     ;sertxd("WA", #white_avg, ", RA", #red_avg, ", GA", #green_avg, ", BA", #blue_avg, 13)
 
@@ -202,9 +203,3 @@ main:
 
     write REGISTER_CHECK_SLOT_1, 1
     run 0
-
-normal_speed:
-    ; Sensor read and average i2c write loop
-    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast, i2cword
-    return

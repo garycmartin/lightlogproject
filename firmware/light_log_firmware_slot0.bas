@@ -62,7 +62,7 @@ table 15, (0x40, 0x01, 0x8D, 0x01, 0x27, 0x01, 0xFA, 0x02, _
 disablebod ; disable 1.9V brownout detector
 disabletime ; Stop the time clock
 disconnect ; Don't listen for re-programming
-gosub normal_speed
+setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
 ; Don't trigger init code if returning from slot 1 program
 symbol REGISTER_CHECK_SLOT_1 = 55
@@ -205,18 +205,17 @@ init:
 main:
     low EEPROM_POWER
     read REGISTER_SAMPLES_PER_AVERAGE, sample_loop
-    gosub low_energy_wait
-    gosub read_RGBW_sensors
+    gosub UI_check_and_read_RGBW_sensors
 
     ; Pre-fill averages for first pass
     red_avg = red
     green_avg = green
     blue_avg = blue
     white_avg = white
+    pause 3
 
 main_loop:
-    gosub low_energy_wait
-    gosub read_RGBW_sensors
+    gosub UI_check_and_read_RGBW_sensors
 
     ; Accumulate average data samples
     red_avg = red + red_avg
@@ -233,29 +232,14 @@ main_loop:
     run 1
 
 
-low_energy_wait:
-    gosub delay_2sec
+UI_check_and_read_RGBW_sensors:
+    setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     gosub check_user_button
-    gosub delay_2sec
     gosub check_user_button
-    gosub delay_2sec
     gosub check_user_button
-    gosub delay_2sec
     gosub check_user_button
-    gosub delay_2sec
     gosub check_user_button
-    return
-
-
-delay_2sec:
-    ; Delay for 2 sec without using the low power sleep watchdog timer 
-    ; More accurate, avoids intermittent crashes, but uses more power
-    read REGISTER_DELAY_WORD, word tmp_word
-    gosub low_speed
-    pauseus tmp_word
-    gosub normal_speed
-    return
-
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
 read_RGBW_sensors:
     ; Enable TCS34725FN light sensor
@@ -298,22 +282,18 @@ read_RGBW_sensors:
 
     ; Wait ~intergration time before reading (should only need ~77ms for default, or so...)
     ; TODO: Move/refactor this delay to an existing natural delay (e.g. button waits?)
-    ; <<<------ FIXME: currently messing up my log timing and stability no doubt...
     pause 44
 
-    ; Sleep once integration cycle completes
+    ; Idle once integration cycle completes <--- can I sleep here or above?
     hi2cout TCS34725FN_ENABLE, (%00000001)
 
     hi2cin TCS34725FN_CDATA, (tmp_low_byte, tmp_high_byte)
 
-    ; Check if overexposed
+    ; Drop to 0 gain and resample if overexposed
     if tmp_word = 0xFFFF and tmp2_low_byte = 0 then
         tmp2_low_byte = 1
         hi2cout TCS34725FN_AGAIN, (0x00)
         goto too_bright_retry_entry_point
-    else
-        ; correct timing if first sample was good
-        pause 51
     endif
 
     ; Remember uncompressed white for use in rgb deltas 
@@ -331,11 +311,19 @@ read_RGBW_sensors:
     green = tmp_word
 
     hi2cin TCS34725FN_BDATA, (tmp_low_byte, tmp_high_byte)
-    gosub scale_into_10bits
-    blue = tmp_word
 
     ; Power off TCS34725FN light sensor
     low SENSOR_POWER
+
+    gosub scale_into_10bits
+    blue = tmp_word
+
+    ; Correct timing if first sample was good (use low power)
+    if tmp2_low_byte = 0 then
+        setfreq k31
+        pauseus 95
+        setfreq M1
+    endif
 
     ;sertxd("W", #white, ", R", #red, ", G", #green, ", B", #blue, 13)
     return
@@ -445,8 +433,10 @@ check_user_button:
         ; Check for button latch
         read REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         if tmp_word > 3 then
+            gosub idle_wait
             return
         endif
+        setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
         inc tmp_word
         write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
@@ -513,10 +503,24 @@ check_user_button:
 
         next tmp2_low_byte
         low LED1, LED2, LED3, LED4, LED5
+        setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
     else
         write REGISTER_BUTTON_LATCHED_WORD, 0, 0
+        gosub idle_wait
     endif
+    return
+
+
+idle_wait:
+    ; Delay for 2 sec without using the low power sleep watchdog timer 
+    ; More accurate, avoids intermittent reboots, but uses more power
+    read REGISTER_DELAY_WORD, word tmp_word
+
+	; time tweak bias based on code path changes
+    tmp_word = tmp_word * 20 / 80
+
+    pauseus tmp_word
     return
 
 
@@ -537,7 +541,9 @@ flash_led:
 
 
 check_serial_comms:
-    gosub comms_speed
+    ; 19200 comms to save power during sync
+    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast_16, i2cword
     sertxd("Hello?")
     serrxd [150, serial_checked], ser_in_byte, tmp_low_byte, tmp_high_byte
 
@@ -580,7 +586,7 @@ check_serial_comms:
     endselect
 
 serial_checked:
-    gosub normal_speed
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     return
 
 
@@ -777,24 +783,4 @@ default_light_calibration:
         readtable tmp_low_byte, tmp_high_byte
         write tmp_low_byte, tmp_high_byte
     next tmp_low_byte
-    return
-
-
-comms_speed:
-    ; 19200 comms to save power during sync
-    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast_16, i2cword
-    return
-
-
-normal_speed:
-    ; Sensor read and average i2c write loop
-    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast, i2cword
-    return
-
-
-low_speed:
-    ; Simulate low power sleep
-    setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     return
