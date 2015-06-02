@@ -26,72 +26,72 @@ POSSIBILITY OF SUCH DAMAGE.
 #endrem
 
 #slot 1
-#no_data ; Make sure re-programming does not zap eeprom data memory
+#no_data ; Make sure re-programming does not wipe eeprom data memory
 #picaxe 14m2
 
-; Run slot 0 if not triggered from slot 0 (can happen after a slot re-program)
-symbol REGISTER_CHECK_SLOT_1 = 55
-symbol tmp_low_byte = b16
-read REGISTER_CHECK_SLOT_1, tmp_low_byte
-if tmp_low_byte != 2 then
-    write REGISTER_CHECK_SLOT_1, 0
-    run 0
-endif
+symbol EEPROM_POWER = C.2
 
-; Save all the power we can
-disablebod ; disable 1.9V brownout detector
-disabletime ; Stop the time clock
-disconnect ; Don't listen for re-programming
-setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+symbol FLAG_OK = %00000000
+symbol REGISTER_LAST_SAVE_WORD = 0
+
+; Populated by table at address 15 on first boot
+symbol REGISTER_2_5KLUX_WHITE_WORD = 21
+symbol REGISTER_5KLUX_WHITE_WORD = 29
+symbol REGISTER_10KLUX_WHITE_WORD = 37
+
+symbol REGISTER_LIGHT_GOAL_WORD = 47
+symbol REGISTER_DAY_PHASE_WORD = 49
+symbol REGISTER_MEMORY_WRAPPED_WORD = 51
+symbol REGISTER_CHECK_SLOT_1 = 55
+
+symbol REGISTER_SAMPLES_PER_AVERAGE = 58
+
+symbol BYTES_PER_RECORD = 6
+symbol EEPROM_TOTAL_BYTES = 65536
+symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
+symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
+symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
+symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
+symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
+
+symbol EEPROM_24LC512 = %10100000
+
+symbol red = w0
+symbol green = w1
+symbol blue = w2
+symbol white = w3
+symbol red_avg = w4
+symbol green_avg = w5
+symbol blue_avg = w6
+symbol white_avg = w7
+symbol tmp_word = w8
+symbol tmp_low_byte = b16
+symbol tmp_high_byte = b17
+symbol tmp2_word = w9
+symbol tmp2_low_byte = b18
+symbol tmp2_high_byte = b19
+symbol red_byte = b20
+symbol green_byte = b21
+symbol blue_byte = b22
+symbol white_byte = b23
+symbol extra_byte = b24
+symbol ser_in_byte = b25
+symbol flag = b26
+symbol sample_loop = b27
 
 init:
-    symbol EEPROM_POWER = C.2
+    ; Run slot 0 if not triggered from slot 0 (can happen after a slot re-program)
+    read REGISTER_CHECK_SLOT_1, tmp_low_byte
+    if tmp_low_byte != 2 then
+        write REGISTER_CHECK_SLOT_1, 0
+        run 0
+    endif
 
-    symbol FLAG_OK = %00000000
-    symbol REGISTER_LAST_SAVE_WORD = 0
-    ; Populated by table at address 15 on first boot
-    symbol REGISTER_2_5KLUX_WHITE_WORD = 21
-    symbol REGISTER_5KLUX_WHITE_WORD = 29
-    symbol REGISTER_10KLUX_WHITE_WORD = 37
-
-    symbol REGISTER_LIGHT_GOAL_WORD = 47
-    symbol REGISTER_DAY_PHASE_WORD = 49
-    symbol REGISTER_MEMORY_WRAPPED_WORD = 51
-
-    symbol REGISTER_SAMPLES_PER_AVERAGE = 58
-
-    symbol BYTES_PER_RECORD = 6
-    symbol EEPROM_TOTAL_BYTES = 65536
-    symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
-    symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
-    symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
-    symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
-    symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
-
-    symbol EEPROM_24LC512 = %10100000
-
-    symbol red = w0
-    symbol green = w1
-    symbol blue = w2
-    symbol white = w3
-    symbol red_avg = w4
-    symbol green_avg = w5
-    symbol blue_avg = w6
-    symbol white_avg = w7
-    symbol tmp_word = w8
-    ;symbol tmp_low_byte = b16
-    symbol tmp_high_byte = b17
-    symbol tmp2_word = w9
-    symbol tmp2_low_byte = b18
-    symbol tmp2_high_byte = b19
-    symbol red_byte = b20
-    symbol green_byte = b21
-    symbol blue_byte = b22
-    symbol white_byte = b23
-    symbol extra_byte = b24
-    symbol ser_in_byte = b25
-    symbol flag = b26
-    symbol sample_loop = b27
+    ; Save all the power we can
+    disablebod ; disable 1.9V brownout detector
+    disabletime ; Stop the time clock
+    disconnect ; Don't listen for re-programming
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
 main:
     ; Calculate averages

@@ -58,120 +58,121 @@ table 15, (0x40, 0x01, 0x8D, 0x01, 0x27, 0x01, 0xFA, 0x02, _
 #no_data ; Make sure re-programming does not wipe eeprom data memory
 #picaxe 14m2
 
-; Save all the power we can
-disablebod ; disable 1.9V brownout detector
-disabletime ; Stop the time clock
-disconnect ; Don't listen for re-programming
-setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+symbol FIRMWARE_VERSION = 21
 
-; Don't trigger init code if returning from slot 1 program
+; 4 = SMT v0.6 Rev A-B in case with small sensor window
+; 5 = SMT v0.6 Rev A-B in case with large sensor window
+symbol HARDWARE_VERSION = 5
+symbol EEPROM_POWER = C.2
+symbol SENSOR_POWER = C.4
+symbol LED1 = C.1
+symbol LED2 = C.0
+symbol LED3 = B.5
+symbol LED4 = B.2
+symbol LED5 = B.1
+symbol EVENT_BUTTON = pinC.3
+
+; 63 = max (due to word int maths and avg overflow risk)
+symbol DEFAULT_SAMPLES_PER_AVERAGE = 6
+symbol DEFAULT_2SEC_DELAY = 1000
+
+symbol FLAG_OK = %00000000
+symbol FLAG_REBOOT = %11000000
+symbol FLAG_TBA = %01000000
+symbol FLAG_BUTTON = %10000000
+
+symbol FIRST_BOOT_PASS_WORD = %1110010110100111
+
+symbol REGISTER_LAST_SAVE_WORD = 0
+symbol REGISTER_REBOOT_COUNT_WORD = 2
+symbol REGISTER_HARDWARE_VERSION_BYTE = 4
+symbol REGISTER_UNIQUE_HW_ID_WORD1 = 5
+symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
+symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
+
+; Populated by table at address 15 on first boot
+symbol REGISTER_2_5KLUX_RED_WORD = 15
+symbol REGISTER_2_5KLUX_GREEN_WORD = 17
+symbol REGISTER_2_5KLUX_BLUE_WORD = 19
+symbol REGISTER_2_5KLUX_WHITE_WORD = 21
+symbol REGISTER_5KLUX_RED_WORD = 23
+symbol REGISTER_5KLUX_GREEN_WORD = 25
+symbol REGISTER_5KLUX_BLUE_WORD = 27
+symbol REGISTER_5KLUX_WHITE_WORD = 29
+symbol REGISTER_10KLUX_RED_WORD = 31
+symbol REGISTER_10KLUX_GREEN_WORD = 33
+symbol REGISTER_10KLUX_BLUE_WORD = 35
+symbol REGISTER_10KLUX_WHITE_WORD = 37
+
+symbol REGISTER_LIGHT_GOAL_WORD = 47
+symbol REGISTER_DAY_PHASE_WORD = 49
+symbol REGISTER_MEMORY_WRAPPED_WORD = 51
+symbol REGISTER_BUTTON_LATCHED_WORD = 53
 symbol REGISTER_CHECK_SLOT_1 = 55
+
+symbol REGISTER_DELAY_WORD = 56
+symbol REGISTER_SAMPLES_PER_AVERAGE = 58
+
+symbol BYTES_PER_RECORD = 6
+symbol EEPROM_TOTAL_BYTES = 65536
+symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
+symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
+symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
+symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
+symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
+
+symbol TCS34725FN = %01010010
+symbol TCS34725FN_ID = %10110010
+symbol TCS34725FN_ATIME = %10100001
+symbol TCS34725FN_AGAIN = %10101111
+symbol TCS34725FN_ENABLE = %10100000
+symbol TCS34725FN_CDATA = %10110100
+symbol TCS34725FN_RDATA = %10110110
+symbol TCS34725FN_GDATA = %10111000
+symbol TCS34725FN_BDATA = %10111010
+symbol EEPROM_24LC512 = %10100000
+
+; Volatile microprecessor memory
+symbol red = w0
+symbol green = w1
+symbol blue = w2
+symbol white = w3
+symbol red_avg = w4
+symbol green_avg = w5
+symbol blue_avg = w6
+symbol white_avg = w7
+symbol tmp_word = w8
 symbol tmp_low_byte = b16
-read REGISTER_CHECK_SLOT_1, tmp_low_byte
-if tmp_low_byte = 1 then
-    write REGISTER_CHECK_SLOT_1, 0
-    goto main
-endif
+symbol tmp_high_byte = b17
+symbol tmp2_word = w9
+symbol tmp2_low_byte = b18
+symbol tmp2_high_byte = b19
+symbol red_byte = b20
+symbol green_byte = b21
+symbol blue_byte = b22
+symbol white_byte = b23
+symbol extra_byte = b24
+symbol ser_in_byte = b25
+symbol flag = b26
+symbol sample_loop = b27
+symbol VAR_WHITE_ORIGINAL_WORD = 28
 
 init:
-    symbol FIRMWARE_VERSION = 21
-    symbol HARDWARE_VERSION = 5 ; SMT v0.6 Rev A in case with larger sensor window
+    ; Save all the power we can
+    disablebod ; disable 1.9V brownout detector
+    disabletime ; Stop the time clock
+    disconnect ; Don't listen for re-programming
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
-    symbol EEPROM_POWER = C.2
-    symbol SENSOR_POWER = C.4
-    symbol LED1 = C.1
-    symbol LED2 = C.0
-    symbol LED3 = B.5
-    symbol LED4 = B.2
-    symbol LED5 = B.1
-    symbol EVENT_BUTTON = pinC.3
+    ; Skip the rest of init code if returning from slot 1 program
+    read REGISTER_CHECK_SLOT_1, tmp_low_byte
+    if tmp_low_byte = 1 then
+        write REGISTER_CHECK_SLOT_1, 0
+        goto main
+    endif
 
     ; Button C.3 internal pullup resistor
     pullup %0000100000000000
-
-    ; 63 = max (due to word int maths and avg overflow risk)
-    symbol DEFAULT_SAMPLES_PER_AVERAGE = 6
-    symbol DEFAULT_2SEC_DELAY = 1000
-
-    symbol FLAG_OK = %00000000
-    symbol FLAG_REBOOT = %11000000
-    symbol FLAG_TBA = %01000000
-    symbol FLAG_BUTTON = %10000000
-
-    symbol FIRST_BOOT_PASS_WORD = %1110010110100111
-
-    symbol REGISTER_LAST_SAVE_WORD = 0
-    symbol REGISTER_REBOOT_COUNT_WORD = 2
-    symbol REGISTER_HARDWARE_VERSION_BYTE = 4
-    symbol REGISTER_UNIQUE_HW_ID_WORD1 = 5
-    symbol REGISTER_UNIQUE_HW_ID_WORD2 = 7
-    symbol REGISTER_FIRST_BOOT_PASS_WORD = 9
-
-    ; Populated by table at address 15 on first boot
-    symbol REGISTER_2_5KLUX_RED_WORD = 15
-    symbol REGISTER_2_5KLUX_GREEN_WORD = 17
-    symbol REGISTER_2_5KLUX_BLUE_WORD = 19
-    symbol REGISTER_2_5KLUX_WHITE_WORD = 21
-    symbol REGISTER_5KLUX_RED_WORD = 23
-    symbol REGISTER_5KLUX_GREEN_WORD = 25
-    symbol REGISTER_5KLUX_BLUE_WORD = 27
-    symbol REGISTER_5KLUX_WHITE_WORD = 29
-    symbol REGISTER_10KLUX_RED_WORD = 31
-    symbol REGISTER_10KLUX_GREEN_WORD = 33
-    symbol REGISTER_10KLUX_BLUE_WORD = 35
-    symbol REGISTER_10KLUX_WHITE_WORD = 37
-
-    symbol REGISTER_LIGHT_GOAL_WORD = 47
-    symbol REGISTER_DAY_PHASE_WORD = 49
-    symbol REGISTER_MEMORY_WRAPPED_WORD = 51
-    symbol REGISTER_BUTTON_LATCHED_WORD = 53
-
-    symbol REGISTER_DELAY_WORD = 56
-    symbol REGISTER_SAMPLES_PER_AVERAGE = 58
-
-    symbol BYTES_PER_RECORD = 6
-    symbol EEPROM_TOTAL_BYTES = 65536
-    symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
-    symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
-    symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
-    symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
-    symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
-
-    symbol TCS34725FN = %01010010
-    symbol TCS34725FN_ID = %10110010
-    symbol TCS34725FN_ATIME = %10100001
-    symbol TCS34725FN_AGAIN = %10101111
-    symbol TCS34725FN_ENABLE = %10100000
-    symbol TCS34725FN_CDATA = %10110100
-    symbol TCS34725FN_RDATA = %10110110
-    symbol TCS34725FN_GDATA = %10111000
-    symbol TCS34725FN_BDATA = %10111010
-    symbol EEPROM_24LC512 = %10100000
-
-    symbol red = w0
-    symbol green = w1
-    symbol blue = w2
-    symbol white = w3
-    symbol red_avg = w4
-    symbol green_avg = w5
-    symbol blue_avg = w6
-    symbol white_avg = w7
-    symbol tmp_word = w8
-    ;symbol tmp_low_byte = b16
-    symbol tmp_high_byte = b17
-    symbol tmp2_word = w9
-    symbol tmp2_low_byte = b18
-    symbol tmp2_high_byte = b19
-    symbol red_byte = b20
-    symbol green_byte = b21
-    symbol blue_byte = b22
-    symbol white_byte = b23
-    symbol extra_byte = b24
-    symbol ser_in_byte = b25
-    symbol flag = b26
-    symbol sample_loop = b27
-
-    symbol VAR_WHITE_ORIGINAL_WORD = 28
 
     ; First boot check
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
