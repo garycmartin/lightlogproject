@@ -390,29 +390,34 @@ def extract_data(data, args, seconds_now, status_dict):
         return data_rows
     else:
         # See if we can use the last save data to calculate accurate timing
-        last_log_end = get_timestamp_from_end_of_file(f)
-        file_end_scent = get_scent_from_end_of_file(f)
-        f.close()
- 
-        skip_rows = search_for_scent(data_rows, file_end_scent)
-        if skip_rows != 0:
-            # Interpolate new time stamps using skip_rows scent and last log end
-            print >> sys.stderr, "Good join between previous and new data."
-            data_rows = data_rows[skip_rows:]
-            new_seconds = last_log_end
-            new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
-            for i in range(len(data_rows)):
-                data_rows[i][4] = int(new_seconds + (new_step_seconds * i))
-        
-        elif data_rows[0][4] < last_log_end:
-            # Estimate using step seconds
-            print >> sys.stderr, "Using step seconds to estimate time stamp."
-            while data_rows[0][4] < last_log_end:
-                data_rows.pop(0)
-
+        try:
+            last_log_end = get_timestamp_from_end_of_file(f)
+            file_end_scent = get_scent_from_end_of_file(f)
+        except IOError:
+            # File was not large enough to hold a reasonable end scent
+            f.close()
+            return data_rows # TODO: Will this add duplicate repeats?
         else:
-            # No scent found and step seconds estimate newer than last log end
-            print >> sys.stderr, "WARNING: estimated %dmin gap between this and previous log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
+            f.close()     
+            skip_rows = search_for_scent(data_rows, file_end_scent)
+            if skip_rows != 0:
+                # Interpolate new time stamps using skip_rows scent and last log end
+                print >> sys.stderr, "Good join between previous and new data."
+                data_rows = data_rows[skip_rows:]
+                new_seconds = last_log_end
+                new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
+                for i in range(len(data_rows)):
+                    data_rows[i][4] = int(new_seconds + (new_step_seconds * i))
+            
+            elif data_rows[0][4] < last_log_end:
+                # Estimate using step seconds
+                print >> sys.stderr, "Using step seconds to estimate time stamp."
+                while data_rows[0][4] < last_log_end:
+                    data_rows.pop(0)
+    
+            else:
+                # No scent found and step seconds estimate newer than last log end
+                print >> sys.stderr, "WARNING: estimated %dmin gap between this and previous log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
             
     return data_rows
 
