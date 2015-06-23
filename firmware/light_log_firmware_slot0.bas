@@ -45,17 +45,9 @@ POSSIBILITY OF SUCH DAMAGE.
                                   –––––
 #endrem
 
-; Lux calibration table (copied into data memory on first boot or factory reset)
-; Each sample is measured from broard spectrum white SAD light source
-; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 2.5k
-; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 5k
-; R_LOW, R_HIGH, G_LOW, G_HIGH, B_LOW, B_HIGH, C_LOW, C_HIGH @ 10k
-table 15, (0x40, 0x01, 0x8D, 0x01, 0x27, 0x01, 0xFA, 0x02, _
-           0x3A, 0x01, 0x8C, 0x01, 0x30, 0x01, 0x33, 0x03, _
-           0x3E, 0x01, 0x8E, 0x01, 0x2B, 0x01, 0x56, 0x03)
-
 #slot 0
 #no_data ; Make sure re-programming does not wipe eeprom data memory
+#no_end
 #picaxe 14m2
 
 symbol FIRMWARE_VERSION = 21
@@ -108,7 +100,6 @@ symbol REGISTER_LIGHT_GOAL_WORD = 47
 symbol REGISTER_DAY_PHASE_WORD = 49
 symbol REGISTER_MEMORY_WRAPPED_WORD = 51
 symbol REGISTER_BUTTON_LATCHED_WORD = 53
-symbol REGISTER_CHECK_SLOT_1 = 55
 
 symbol REGISTER_DELAY_WORD = 56
 symbol REGISTER_SAMPLES_PER_AVERAGE = 58
@@ -156,6 +147,14 @@ symbol ser_in_byte = b25
 symbol flag = b26
 symbol sample_loop = b27
 symbol VAR_WHITE_ORIGINAL_WORD = 28
+symbol VAR_SLOT_STATE_CHECK = 30
+
+symbol SLOT_NULL = 0
+symbol SLOT_MAIN_SAMPLE_LOOP = 1
+symbol SLOT_STORE_SAMPLES = 2
+symbol SLOT_CHECK_SERIAL_COMMS = 3
+symbol SLOT_UI_CHECK_AND_READ_RGBW = 4
+symbol SLOT_FIRST_BOOT_INIT = 5
 
 init:
     ; Save all the power we can
@@ -164,11 +163,15 @@ init:
     disconnect ; Don't listen for re-programming
     setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
-    ; Skip the rest of init code if returning from slot 1 program
-    read REGISTER_CHECK_SLOT_1, tmp_low_byte
-    if tmp_low_byte = 1 then
-        write REGISTER_CHECK_SLOT_1, 0
-        goto main
+    ; Check for previous slot states
+    peek VAR_SLOT_STATE_CHECK, tmp2_low_byte
+    poke VAR_SLOT_STATE_CHECK, SLOT_NULL
+    if tmp2_low_byte = SLOT_MAIN_SAMPLE_LOOP then
+        goto main_sample_loop
+    elseif tmp2_low_byte = SLOT_UI_CHECK_AND_READ_RGBW then
+        gosub bargraph_display
+        gosub UI_check_and_read_RGBW
+        goto main_sample_loop
     endif
 
     ; Button C.3 internal pullup resistor
@@ -177,7 +180,9 @@ init:
     ; First boot check
     read REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
     if tmp_word != FIRST_BOOT_PASS_WORD then
-        gosub first_boot_init
+        ; Run first_boot_init code over in slot 1
+        poke VAR_SLOT_STATE_CHECK, SLOT_FIRST_BOOT_INIT
+        run 1
     endif
 
     ; Check delay is set to a reasonable value
@@ -203,10 +208,10 @@ init:
 
     flag = FLAG_REBOOT
 
-main:
+main_sample_loop:
     low EEPROM_POWER
     read REGISTER_SAMPLES_PER_AVERAGE, sample_loop
-    gosub UI_check_and_read_RGBW_sensors
+    gosub UI_check_and_read_RGBW
 
     ; Pre-fill averages for first pass
     red_avg = red
@@ -216,7 +221,7 @@ main:
     pause 3
 
 main_loop:
-    gosub UI_check_and_read_RGBW_sensors
+    gosub UI_check_and_read_RGBW
 
     ; Accumulate average data samples
     red_avg = red + red_avg
@@ -229,11 +234,12 @@ main_loop:
         goto main_loop
     endif
 
-    write REGISTER_CHECK_SLOT_1, 2
+	; Calculate averages and store samples to eeprom over in slot 1
+    poke VAR_SLOT_STATE_CHECK, SLOT_STORE_SAMPLES
     run 1
 
 
-UI_check_and_read_RGBW_sensors:
+UI_check_and_read_RGBW:
     setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     gosub check_user_button
     gosub check_user_button
@@ -323,7 +329,7 @@ read_RGBW_sensors:
     if tmp2_low_byte = 0 then
         setfreq k31
         pauseus 95
-        setfreq M1
+        setfreq m1
     endif
 
     ;sertxd("W", #white, ", R", #red, ", G", #green, ", B", #blue, 13)
@@ -442,74 +448,91 @@ check_user_button:
         write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
 
-        ; User feedback based on light goal
+        ; User feedback based on current light level and goal
         gosub read_RGBW_sensors
 
-        gosub check_serial_comms
+        ; Use 19200 baud to save power during comms
+        setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+        sertxd("Hello?")
+        serrxd [150, serial_checked], ser_in_byte, tmp_low_byte, tmp_high_byte
 
-        ; Allow program upload during a button press
-        reconnect
+            ; Serial comms detected, run slot 1's check_serial_comms
+            setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+            poke VAR_SLOT_STATE_CHECK, SLOT_CHECK_SERIAL_COMMS
+            run 1
 
-        ; Lead into bargraph
-        gosub flash_led
+        serial_checked:
+        ; TODO: Check this goto is safe inside an if statement
+        setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
-        ; Prevent program upload (saves power)
-        disconnect
+        gosub bargraph_display
 
-        ; Check if illumination is currently bright enough to count to goal
-        read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
-        if white >= tmp_word then
-            tmp2_high_byte = 16
-        else
-            tmp2_high_byte = 48
-        endif
-
-        ; Display bar graph animation for daily goal progress
-        read REGISTER_LIGHT_GOAL_WORD, word tmp_word
-        for tmp2_low_byte = 0 to 6
-            high LED5
-            if tmp_word >= 12000 then
-                high LED4
-            endif
-            if tmp_word >= 24000 then
-                high LED3
-            endif
-            if tmp_word >= 36000 then
-                high LED2
-            endif
-            if tmp_word >= 48000 then
-                high LED1
-            endif
-            pause tmp2_high_byte
-
-            if tmp_word < 12000 then
-                low LED5
-            endif
-            if tmp_word < 24000 then
-                low LED4
-            endif
-            if tmp_word < 36000 then
-                low LED3
-            endif
-            if tmp_word < 48000 then
-                low LED2
-            endif
-            if tmp_word < 60000 then
-                low LED1
-            endif
-            if tmp_word = 60000 then
-                low LED1, LED2, LED3, LED4, LED5
-            endif
-            pause tmp2_high_byte
-
-        next tmp2_low_byte
-        low LED1, LED2, LED3, LED4, LED5
         setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-
     else
         write REGISTER_BUTTON_LATCHED_WORD, 0, 0
         gosub idle_wait
     endif
+    return
+
+
+bargraph_display:
+    ; Allow program upload during a button press
+    reconnect
+
+    ; Animate into bargraph display
+    gosub flash_led
+
+    ; Prevent program upload (saves power)
+    disconnect
+
+    ; Check if illumination is bright enough to count to goal
+    read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
+    if white >= tmp_word then
+        tmp2_high_byte = 16
+    else
+        tmp2_high_byte = 48
+    endif
+
+    ; Display bar graph animation for daily goal progress
+    read REGISTER_LIGHT_GOAL_WORD, word tmp_word
+    for tmp2_low_byte = 0 to 6
+        high LED5
+        if tmp_word >= 12000 then
+            high LED4
+        endif
+        if tmp_word >= 24000 then
+            high LED3
+        endif
+        if tmp_word >= 36000 then
+            high LED2
+        endif
+        if tmp_word >= 48000 then
+            high LED1
+        endif
+        pause tmp2_high_byte
+
+        if tmp_word < 12000 then
+            low LED5
+        endif
+        if tmp_word < 24000 then
+            low LED4
+        endif
+        if tmp_word < 36000 then
+            low LED3
+        endif
+        if tmp_word < 48000 then
+            low LED2
+        endif
+        if tmp_word < 60000 then
+            low LED1
+        endif
+        if tmp_word = 60000 then
+            low LED1, LED2, LED3, LED4, LED5
+        endif
+        pause tmp2_high_byte
+
+    next tmp2_low_byte
+    low LED1, LED2, LED3, LED4, LED5
     return
 
 
@@ -518,7 +541,7 @@ idle_wait:
     ; More accurate, avoids intermittent reboots, but uses more power
     read REGISTER_DELAY_WORD, word tmp_word
 
-	; time tweak bias based on code path changes
+	; Time tweak bias based on code path changes
     tmp_word = tmp_word * 20 / 80
 
     pauseus tmp_word
@@ -526,7 +549,7 @@ idle_wait:
 
 
 flash_led:
-    ; Simple LED sequence flash
+    ; Left to right LED sequence flash
     high LED5
     pause 8
     toggle LED5, LED4
@@ -538,250 +561,4 @@ flash_led:
     toggle LED2, LED1
     pause 8
     low LED1
-    return
-
-
-check_serial_comms:
-    ; 19200 comms to save power during sync
-    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    hi2csetup i2cmaster, EEPROM_24LC512, i2cfast_16, i2cword
-    sertxd("Hello?")
-    serrxd [150, serial_checked], ser_in_byte, tmp_low_byte, tmp_high_byte
-
-    select case ser_in_byte
-        case "a"
-        gosub header_block
-
-        case "c"
-        gosub dump_data
-
-        case "e"
-        gosub reset_pointer
-
-        case "h"
-        gosub calibrate_2_5Klux
-
-        case "i"
-        gosub calibrate_5Klux
-
-        case "j"
-        gosub calibrate_10Klux
-
-        case "k"
-        gosub default_light_calibration
-
-        case "l"
-        gosub zero_light_goal
-
-        case "d"
-        gosub set_time_delay
-
-        case "p"
-        gosub set_day_phase
-
-        case "s"
-        gosub set_samples_per_average
-
-        case "z"
-        gosub first_boot_init
-    endselect
-
-serial_checked:
-    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-    return
-
-
-set_time_delay:
-    ; Used to fine tune device delay
-    write REGISTER_DELAY_WORD, word tmp_word
-    return
-
-
-set_samples_per_average:
-    ; 1 sample every 10 sec, defaults to 6 samples per average = 1 per min
-    write REGISTER_SAMPLES_PER_AVERAGE, tmp_low_byte
-    return
-
-
-calibrate_2_5Klux:
-    write REGISTER_2_5KLUX_RED_WORD, word red
-    write REGISTER_2_5KLUX_GREEN_WORD, word green
-    write REGISTER_2_5KLUX_BLUE_WORD, word blue
-    write REGISTER_2_5KLUX_WHITE_WORD, word white
-    return
-
-
-calibrate_5Klux:
-    write REGISTER_5KLUX_RED_WORD, word red
-    write REGISTER_5KLUX_GREEN_WORD, word green
-    write REGISTER_5KLUX_BLUE_WORD, word blue
-    write REGISTER_5KLUX_WHITE_WORD, word white
-    return
-
-
-calibrate_10Klux:
-    write REGISTER_10KLUX_RED_WORD, word red
-    write REGISTER_10KLUX_GREEN_WORD, word green
-    write REGISTER_10KLUX_BLUE_WORD, word blue
-    write REGISTER_10KLUX_WHITE_WORD, word white
-    return
-
-
-header_block:
-    read REGISTER_UNIQUE_HW_ID_WORD1, word tmp2_word
-    sertxd("ID:", #tmp2_word)
-    read REGISTER_UNIQUE_HW_ID_WORD2, word tmp2_word
-    sertxd(",", #tmp2_word, ";")
-    read REGISTER_HARDWARE_VERSION_BYTE, tmp2_word
-    sertxd("HW:", #tmp2_word, ";")
-    sertxd("FW:", #FIRMWARE_VERSION, ";")
-    read REGISTER_REBOOT_COUNT_WORD, word tmp2_word
-    sertxd("Boots:", #tmp2_word, ";")
-    read REGISTER_LAST_SAVE_WORD, word tmp2_word
-    sertxd("Pointer:", #tmp2_word, ";")
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp2_word
-    sertxd("Wrap:", #tmp2_word, ";")
-    read REGISTER_SAMPLES_PER_AVERAGE, tmp2_low_byte
-    tmp2_word = tmp2_low_byte * 10
-    sertxd("Period:", #tmp2_word, ";")
-    read REGISTER_2_5KLUX_RED_WORD, word tmp2_word
-    sertxd("2.5KluxR:", #tmp2_word, ";")
-    read REGISTER_2_5KLUX_GREEN_WORD, word tmp2_word
-    sertxd("2.5KluxG:", #tmp2_word, ";")
-    read REGISTER_2_5KLUX_BLUE_WORD, word tmp2_word
-    sertxd("2.5KluxB:", #tmp2_word, ";")
-    read REGISTER_2_5KLUX_WHITE_WORD, word tmp2_word
-    sertxd("2.5KluxW:", #tmp2_word, ";")
-    read REGISTER_5KLUX_RED_WORD, word tmp2_word
-    sertxd("5KluxR:", #tmp2_word, ";")
-    read REGISTER_5KLUX_GREEN_WORD, word tmp2_word
-    sertxd("5KluxG:", #tmp2_word, ";")
-    read REGISTER_5KLUX_BLUE_WORD, word tmp2_word
-    sertxd("5KluxB:", #tmp2_word, ";")
-    read REGISTER_5KLUX_WHITE_WORD, word tmp2_word
-    sertxd("5KluxW:", #tmp2_word, ";")
-    read REGISTER_10KLUX_RED_WORD, word tmp2_word
-    sertxd("10KluxR:", #tmp2_word, ";")
-    read REGISTER_10KLUX_GREEN_WORD, word tmp2_word
-    sertxd("10KluxG:", #tmp2_word, ";")
-    read REGISTER_10KLUX_BLUE_WORD, word tmp2_word
-    sertxd("10KluxB:", #tmp2_word, ";")
-    read REGISTER_10KLUX_WHITE_WORD, word tmp2_word
-    sertxd("10KluxW:", #tmp2_word, ";")
-    read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
-    sertxd("Goal:", #tmp2_word, ";")
-    read REGISTER_DAY_PHASE_WORD, word tmp2_word
-    sertxd("Phase:", #tmp2_word, ";")
-    read REGISTER_DELAY_WORD, word tmp2_word
-    sertxd("Delay:", #tmp2_word, ";")
-    calibadc10 tmp2_word
-    tmp2_word = 52378 / tmp2_word * 2
-    sertxd("Batt:", #tmp2_word, "0mV", ";")
-    sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
-    sertxd("head_eof")
-    return
-
-
-set_day_phase:
-    ; Update day phase (crude test to check the value is at least sane)
-    if tmp_word < 1440 then
-        read REGISTER_DAY_PHASE_WORD, word tmp2_word
-        ; Try and estimate if daily accumulated goal should be reset
-        if tmp2_word > 1080 and tmp_word < 360 then
-            gosub zero_light_goal
-        endif
-        write REGISTER_DAY_PHASE_WORD, word tmp_word
-    endif
-    return
-
-
-dump_data:
-    ; Output data oldest to newest
-    high EEPROM_POWER
-    gosub header_block
-    gosub set_day_phase ; serial comms word passed via tmp_word
-    read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
-    if tmp_word > 0 then
-        ; Dump end block of memory first if memory has wrapped one or more times
-        gosub dump_from_index_to_end
-    endif
-    gosub dump_up_to_index
-    low EEPROM_POWER
-    sertxd("data_eof")
-    return
-
-
-dump_up_to_index:
-    read REGISTER_LAST_SAVE_WORD, word tmp_word
-    if tmp_word != 0 then
-        tmp_word = tmp_word - BYTES_PER_RECORD - 1
-    endif
-    for tmp2_word = 0 to tmp_word step 6
-        ; ser_in_byte used instead of flag to preserve its value
-        hi2cin tmp2_word, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-    next tmp2_word
-    return
-
-
-dump_from_index_to_end:
-    read REGISTER_LAST_SAVE_WORD, word tmp_word
-    if tmp_word != 0 then
-        tmp_word = tmp_word - BYTES_PER_RECORD
-    endif
-    for tmp2_word = tmp_word to LAST_VALID_BYTE step 6
-        ; ser_in_byte used instead of flag to preserve its value
-        hi2cin tmp2_word, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-        sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
-    next tmp2_word
-    return
-
-
-reset_pointer:
-    ; Reset pointers back to start of mem
-    write REGISTER_LAST_SAVE_WORD, 0, 0
-    write REGISTER_MEMORY_WRAPPED_WORD, 0, 0
-    return
-
-
-first_boot_init:
-    gosub default_light_calibration
-    gosub reset_pointer
-    write REGISTER_REBOOT_COUNT_WORD, 0, 0
-    gosub zero_light_goal
-    write REGISTER_DAY_PHASE_WORD, 0, 0
-    write REGISTER_HARDWARE_VERSION_BYTE, HARDWARE_VERSION
-    tmp_word = DEFAULT_2SEC_DELAY
-    gosub set_time_delay
-    tmp_low_byte = DEFAULT_SAMPLES_PER_AVERAGE
-    gosub set_samples_per_average
-
-    ; Generate unique hardware id (seed from sensor and battery readings)
-    gosub read_RGBW_sensors
-    calibadc10 tmp_word
-    tmp_word = red * green * blue * white * tmp_word
-    random tmp_word
-    write REGISTER_UNIQUE_HW_ID_WORD1, word tmp_word
-    tmp_word = red * green * blue * white * tmp_word
-    random tmp_word
-    write REGISTER_UNIQUE_HW_ID_WORD2, word tmp_word
-
-    ; Mark first boot as passed
-    tmp_word = FIRST_BOOT_PASS_WORD
-    write REGISTER_FIRST_BOOT_PASS_WORD, word tmp_word
-    return
-
-
-zero_light_goal:
-    write REGISTER_LIGHT_GOAL_WORD, 0, 0
-    return
-
-
-default_light_calibration:
-    ; Default calibration using full spectrum white light measured at room temp.
-    ; Copies table bytes into matching memory data address 15 onwards
-    for tmp_low_byte = 15 to 39
-        readtable tmp_low_byte, tmp_high_byte
-        write tmp_low_byte, tmp_high_byte
-    next tmp_low_byte
     return
