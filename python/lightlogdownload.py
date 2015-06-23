@@ -219,7 +219,7 @@ def linear_interpolation(x, HW):
     """\
     Linear interpolation between recorded data point values from HW4 digital sensor devices.
     """
-    if HW == 5:
+    if HW >= 5:
         # SMT digital sensor in white case with larger sensor window
         calibration_data = [(0, 0), (1, 39), (8, 193), (50, 389), (100, 461), (250, 521), (500, 605), (1000, 673), (2500, 762), (5000, 819), (10000, 854), (15000, 880), (33000, 983), (60000, 1023)]
 
