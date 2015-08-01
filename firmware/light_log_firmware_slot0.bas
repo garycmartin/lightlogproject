@@ -331,30 +331,53 @@ read_RGBW_sensors:
 
 
 scale_into_10bits:
-    ; Scale colour into a 10bit value based on white value as 100% (=1024)
+    ; Scale colour into a 10bit value based on white value as 100% (=1023)
     ; WARNING: blue variable being used as a tmp variable here
     blue = tmp_word
     peek VAR_WHITE_ORIGINAL_WORD, word tmp_word
 
-    ; White should always be larger rgb colour...
-    if tmp_word < blue then
+    ; White should always be the larger rgb colour...
+    if tmp_word = 0 then
+        return
+    elseif tmp_word < blue then
         tmp_word = blue
     endif
 
     ; Make the best out of integer maths
-    if blue > 6553 then
-        tmp_word = tmp_word / 1023
+    if blue > 32768 then
+        tmp_word = tmp_word / 1024 + 1
         tmp_word = blue / tmp_word
-    elseif blue > 655 then
-        tmp_word = tmp_word / 102
-        tmp_word = blue * 10 / tmp_word
-    elseif blue >= 66 then
-        tmp_word = tmp_word / 10
-        tmp_word = blue * 102 / tmp_word
-    elseif tmp_word > 0 then
-        tmp_word = blue * 1023 / tmp_word
+        ;tmp_word = tmp_word + 1 / 1024
+        ;tmp_word = blue + 1 / tmp_word
+    elseif blue > 16384 then
+        tmp_word = tmp_word / 512 + 1
+        tmp_word = blue * 2 - 1 / tmp_word
+    elseif blue > 8192 then
+        tmp_word = tmp_word / 256 + 1
+        tmp_word = blue * 4 - 1 / tmp_word
+    elseif blue > 4096 then
+        tmp_word = tmp_word / 128 + 1
+        tmp_word = blue * 8 - 1 / tmp_word
+    elseif blue > 2048 then
+        tmp_word = tmp_word / 64 + 1
+        tmp_word = blue * 16 - 1 / tmp_word
+    elseif blue > 1024 then
+        tmp_word = tmp_word / 32 + 1
+        tmp_word = blue * 32 - 1 / tmp_word
+    elseif blue > 512 then
+        tmp_word = tmp_word / 16 + 1
+        tmp_word = blue * 64 - 1 / tmp_word
+    elseif blue > 128 then
+        tmp_word = tmp_word / 8 + 1
+        tmp_word = blue * 128 - 1 / tmp_word
+    elseif blue > 64 then
+        tmp_word = tmp_word / 4 + 1
+        tmp_word = blue * 256 - 1 / tmp_word
+    elseif blue > 32 then
+        tmp_word = tmp_word / 2 + 1
+        tmp_word = blue * 512 - 1 / tmp_word
     else
-        tmp_word = 0
+        tmp_word = blue * 1024 - 1 / tmp_word
     endif
 
     ; Keep within 10bit range (int maths can exceed)
