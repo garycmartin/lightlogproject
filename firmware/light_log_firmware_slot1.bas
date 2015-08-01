@@ -275,6 +275,8 @@ store_samples:
         write REGISTER_LAST_SAVE_WORD, word tmp_word
     endif
 
+    low EEPROM_POWER
+
     poke VAR_SLOT_STATE_CHECK, SLOT_MAIN_SAMPLE_LOOP
     run 0
 
