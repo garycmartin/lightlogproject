@@ -92,6 +92,9 @@ def get_args():
     parser.add_argument("--csv-header",
                         help="outputs column header in first row of data (new log files only)",
                         action="store_true")
+    parser.add_argument("--estimate",
+                        help="force time estimate based on device period setting rather than log time data",
+                        action="store_true")
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-f", "--file",
@@ -406,8 +409,13 @@ def extract_data(data, args, seconds_now, status_dict):
             f.close()
             return data_rows # TODO: Will this add duplicate repeats?
         else:
-            f.close()     
-            skip_rows = search_for_scent(data_rows, file_end_scent)
+            f.close()
+            if not args.estimate:
+                skip_rows = search_for_scent(data_rows, file_end_scent)
+            else:
+                # Allow user to force estimate by step seconds
+                skip_rows = 0
+                
             if skip_rows != 0:
                 # Interpolate new time stamps using skip_rows scent and last log end
                 print >> sys.stderr, "Good join between previous and new data."
