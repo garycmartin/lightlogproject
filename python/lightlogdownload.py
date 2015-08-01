@@ -181,12 +181,20 @@ def parse_status_header(status):
                                         int(status_dict['ID'].split(',')[1]))
 
     # Battery output in mV
-    status_dict['Batt'] = int(status_dict['Batt'][:-2])
+    if 'Batt' in status_dict:
+        status_dict['Batt'] = int(status_dict['Batt'][:-2])
+        
+    if 'BattSlp' in status_dict:
+        status_dict['BattSlp'] = int(status_dict['BattSlp'][:-2])
+        
+    if 'BattSen' in status_dict:
+        status_dict['BattSen'] = int(status_dict['BattSen'][:-2])
 
     # Convert relavent strings to int
     for i in ('Goal', 'FW', '10KluxB', '5KluxB', '5KluxG', '5KluxR', '5KluxW', 'Delay',
               'Phase', '2.5KluxG','2.5KluxB','HW', '2.5KluxW','2.5KluxR', 'Period',
-              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt'):
+              '10KluxG', 'Boots', 'Wrap', '10KluxW', 'Pointer', '10KluxR', 'Batt',
+              'BattSlp', 'BattSen'):
         if i in status_dict:
             status_dict[i] = int(status_dict[i])
 
@@ -638,7 +646,12 @@ def main():
                 ideal_delay = (samples_stored / float(time_difference + samples_stored)) * device_delay
                 print >> sys.stderr, 'Device delay tuning is set to %d (%d suggested)' % (device_delay, int(round(ideal_delay)))
 
-        print >> sys.stderr, "Battery %dmV" % (status_dict['Batt'])
+        print >> sys.stderr, "Battery %dmV" % (status_dict['Batt']),
+        if 'BattSen' in status_dict and 'BattSlp' in status_dict:
+            print >> sys.stderr, "(sensor:%dmV, sleep:%dmV)" % (status_dict['BattSen'],
+                status_dict['BattSlp'])        
+        else:
+            print >> sys.stderr
 
     elif data[-8:] == 'head_eof':
         # Status header block only
