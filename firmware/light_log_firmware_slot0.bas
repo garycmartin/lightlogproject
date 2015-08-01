@@ -241,9 +241,9 @@ UI_check_and_read_RGBW:
     gosub check_user_button
     gosub check_user_button
     gosub check_user_button
-    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
 
 read_RGBW_sensors:
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     ; Enable TCS34725FN light sensor
     high SENSOR_POWER
 
@@ -438,7 +438,6 @@ check_user_button:
             gosub idle_wait
             return
         endif
-        setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
         inc tmp_word
         write REGISTER_BUTTON_LATCHED_WORD, word tmp_word
         flag = flag | FLAG_BUTTON
@@ -452,17 +451,13 @@ check_user_button:
         serrxd [150, serial_checked], ser_in_byte, tmp_low_byte, tmp_high_byte
 
             ; Serial comms detected, run slot 1's check_serial_comms
-            setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
             poke VAR_SLOT_STATE_CHECK, SLOT_CHECK_SERIAL_COMMS
             run 1
 
         serial_checked:
-        ; TODO: Check this goto is safe inside an if statement
-        setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
-
         gosub bargraph_display
-
         setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+
     else
         write REGISTER_BUTTON_LATCHED_WORD, 0, 0
         gosub idle_wait
@@ -471,6 +466,7 @@ check_user_button:
 
 
 bargraph_display:
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
     ; Allow program upload during a button press
     reconnect
 
