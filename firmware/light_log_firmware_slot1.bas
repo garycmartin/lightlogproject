@@ -94,12 +94,7 @@ symbol REGISTER_DELAY_WORD = 56
 symbol REGISTER_SAMPLES_PER_AVERAGE = 58
 
 symbol BYTES_PER_RECORD = 6
-symbol EEPROM_TOTAL_BYTES = 65536
-symbol END_EEPROM_ADDRESS = EEPROM_TOTAL_BYTES - 1
-symbol BYTE_GAP_AT_END = EEPROM_TOTAL_BYTES % BYTES_PER_RECORD
-symbol GAP_PLUS_RECORD = BYTE_GAP_AT_END + BYTES_PER_RECORD
-symbol LAST_VALID_RECORD = END_EEPROM_ADDRESS - GAP_PLUS_RECORD
-symbol LAST_VALID_BYTE = END_EEPROM_ADDRESS - BYTE_GAP_AT_END
+symbol EEPROM_WRAP = 65529 ; 65535 - 6
 
 symbol TCS34725FN = %01010010
 symbol TCS34725FN_ID = %10110010
@@ -268,10 +263,10 @@ store_samples:
     flag = FLAG_OK ; Clear any flag states
 
     ; Increment and write current position to micro eprom
-    if tmp_word >= LAST_VALID_RECORD then
+    if tmp_word >= EEPROM_WRAP then
         write REGISTER_LAST_SAVE_WORD, 0, 0
 
-        ; Keep track of memory wrapps
+        ; Keep track of memory wraps
         read REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
         inc tmp_word
         write REGISTER_MEMORY_WRAPPED_WORD, word tmp_word
@@ -480,7 +475,7 @@ dump_from_index_to_end:
     if tmp_word != 0 then
         tmp_word = tmp_word - BYTES_PER_RECORD
     endif
-    for tmp2_word = tmp_word to LAST_VALID_BYTE step 6
+    for tmp2_word = tmp_word to EEPROM_WRAP step BYTES_PER_RECORD
         ; ser_in_byte used instead of flag to preserve its value
         hi2cin tmp2_word, (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
         sertxd (red_byte, green_byte, blue_byte, white_byte, extra_byte, ser_in_byte)
