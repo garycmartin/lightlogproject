@@ -232,18 +232,22 @@ store_samples:
     ; Store least significant bytes
     red_byte = red_avg     & %11111111
     hi2cout tmp_word, (red_byte)
+    pause 2
     inc tmp_word
 
     green_byte = green_avg & %11111111
     hi2cout tmp_word, (green_byte)
+    pause 2
     inc tmp_word
 
     blue_byte = blue_avg   & %11111111
     hi2cout tmp_word, (blue_byte)
+    pause 2
     inc tmp_word
 
     white_byte = white_avg & %11111111
     hi2cout tmp_word, (white_byte)
+    pause 2
     inc tmp_word
 
     ; Fill extra_byte with 9th and 10th bits of each RGBT
@@ -253,9 +257,11 @@ store_samples:
     extra_byte = white_avg & %1100000000 / 4  + extra_byte
 
     hi2cout tmp_word, (extra_byte)
+    pause 2
     inc tmp_word
 
     hi2cout tmp_word, (flag)
+    pause 2
     inc tmp_word
 
     ;sertxd("WB", #white_byte, ", RB", #red_byte, ", GB", #green_byte, ", BB", #blue_byte, ", EB", #extra_byte, 13)
