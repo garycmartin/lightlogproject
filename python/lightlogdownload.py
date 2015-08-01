@@ -599,6 +599,12 @@ def main():
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
         
+        # If available use device's sample period
+        if 'Period' in status_dict:
+            global STEP_SECONDS
+            STEP_SECONDS = status_dict['Period']
+            print >> sys.stderr, "Using %dsec step" % STEP_SECONDS
+        
         if args.stdout:
             data_rows = extract_data(data, args, seconds_now, status_dict)
             output_data_to_stdout(data_rows, args, status_dict)
