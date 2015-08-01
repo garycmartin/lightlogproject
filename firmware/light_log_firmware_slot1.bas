@@ -415,6 +415,18 @@ header_block:
     calibadc10 tmp2_word
     tmp2_word = 52378 / tmp2_word * 2
     sertxd("Batt:", #tmp2_word, "0mV", ";")
+    setfreq m1 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    high SENSOR_POWER
+    calibadc10 tmp2_word
+    low SENSOR_POWER
+    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    tmp2_word = 52378 / tmp2_word * 2
+    sertxd("BattSen:", #tmp2_word, "0mV", ";")
+    setfreq k31 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    calibadc10 tmp2_word
+    setfreq m16 ; k31, k250, k500, m1, m2, m4, m8, m16, m32
+    tmp2_word = 52378 / tmp2_word * 2
+    sertxd("BattSlp:", #tmp2_word, "0mV", ";")
     sertxd("RGBW:", #red, ",", #green, ",", #blue, ",", #white)
     sertxd("head_eof")
     return
