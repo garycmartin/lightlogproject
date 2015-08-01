@@ -216,6 +216,13 @@ main_sample_loop:
     pause 3
 
 main_loop:
+    dec sample_loop
+    if sample_loop = 0 then
+    	; Calculate averages and store samples to eeprom over in slot 1
+        poke VAR_SLOT_STATE_CHECK, SLOT_STORE_SAMPLES
+        run 1
+    endif
+
     gosub UI_check_and_read_RGBW
 
     ; Accumulate average data samples
@@ -223,15 +230,7 @@ main_loop:
     green_avg = green + green_avg
     blue_avg = blue + blue_avg
     white_avg = white + white_avg
-
-    dec sample_loop
-    if sample_loop > 1 then
-        goto main_loop
-    endif
-
-	; Calculate averages and store samples to eeprom over in slot 1
-    poke VAR_SLOT_STATE_CHECK, SLOT_STORE_SAMPLES
-    run 1
+    goto main_loop
 
 
 UI_check_and_read_RGBW:
