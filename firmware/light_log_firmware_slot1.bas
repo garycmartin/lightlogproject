@@ -183,24 +183,27 @@ store_samples:
     ; Accumulate light for goal target
     read REGISTER_2_5KLUX_WHITE_WORD, word tmp_word
     read REGISTER_5KLUX_WHITE_WORD, word tmp2_word
+    read REGISTER_SAMPLES_PER_AVERAGE, extra_byte
     if white_avg >= tmp_word and white_avg < tmp2_word then
         tmp2_word = tmp2_word - tmp_word ; 5K - 2.5K calibration delta
-        tmp2_word = 500 / tmp2_word ; scale factor for one sensor unit
-        tmp_word = white_avg - tmp_word * tmp2_word + 500; goal points between 500 and 1,000
+        tmp2_word = 84 * extra_byte / tmp2_word ; scale factor for one sensor unit
+        tmp_word = white_avg - tmp_word * tmp2_word; goal points from 500 and 1,000 per min
+        tmp_word = 84 * extra_byte + tmp_word
         goto goal_update
     endif
 
     read REGISTER_10KLUX_WHITE_WORD, word tmp_word
     if white_avg >= tmp2_word and white_avg < tmp_word then
         tmp_word = tmp_word - tmp2_word ; 10K - 5K calibration delta
-        tmp_word = 1000 / tmp_word ; scale factor for one sensor unit
-        tmp_word = white_avg - tmp2_word * tmp_word + 1000; goal points between 1,000 and 2,000
+        tmp_word = 167 * extra_byte / tmp_word ; scale factor for one sensor unit
+        tmp_word = white_avg - tmp2_word * tmp_word; goal points from 1,000 and 2,000 per min
+        tmp_word = 167 * extra_byte + tmp_word
         goto goal_update
     endif
 
     ; Check for brighter than 10K lux max score
     if white_avg >= tmp_word then
-        tmp_word = 2000 ; maximum 2,000 points per min
+        tmp_word = 334 * extra_byte ; max 2,000 goal points per min
     else
         goto end_goal_update
     endif
@@ -209,7 +212,9 @@ store_samples:
         ; Update the goal units reached so far into memory
         read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
         tmp2_word = tmp2_word + tmp_word
-        if tmp2_word > 60000 then
+        if tmp2_word < tmp_word then
+            tmp2_word = 60000
+        else if tmp2_word > 60000 then
             tmp2_word = 60000
         endif
         write REGISTER_LIGHT_GOAL_WORD, word tmp2_word
