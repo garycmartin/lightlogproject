@@ -50,7 +50,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #no_end
 #picaxe 14m2
 
-symbol FIRMWARE_VERSION = 21
+symbol FIRMWARE_VERSION = 22
 
 ; 4 = SMT v0.6 Rev A-B in case with small sensor window
 ; 5 = SMT v0.6 Rev A-B in case with large sensor window
