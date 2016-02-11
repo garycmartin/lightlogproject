@@ -224,8 +224,9 @@ store_samples:
     ; Keep track of day phase cycle
     read REGISTER_DAY_PHASE_WORD, word tmp_word
     inc tmp_word
-    if tmp_word >= 1440 then
-        ; Reset goal and counter cycle every 1440 min
+    tmp2_word = 8640 / extra_byte ; 8640 is number of 10sec samples in 24hrs
+    if tmp_word >= tmp2_word then
+        ; Reset goal and counter cycle every 24hrs
         write REGISTER_LIGHT_GOAL_WORD, 0, 0
         tmp_word = 0
     endif
@@ -417,6 +418,8 @@ header_block:
     read REGISTER_LIGHT_GOAL_WORD, word tmp2_word
     sertxd("Goal:", #tmp2_word, ";")
     read REGISTER_DAY_PHASE_WORD, word tmp2_word
+    read REGISTER_SAMPLES_PER_AVERAGE, extra_byte
+    tmp2_word = tmp2_word / 6 * extra_byte
     sertxd("Phase:", #tmp2_word, ";")
     read REGISTER_DELAY_WORD, word tmp2_word
     sertxd("Delay:", #tmp2_word, ";")
@@ -444,10 +447,14 @@ set_day_phase:
     ; Update day phase (crude test to check the value is at least sane)
     if tmp_word < 1440 then
         read REGISTER_DAY_PHASE_WORD, word tmp2_word
+        read REGISTER_SAMPLES_PER_AVERAGE, extra_byte
+        tmp2_word = tmp2_word / 6 * extra_byte
         ; Try and estimate if daily accumulated goal should be reset
-        if tmp2_word > 1080 and tmp_word < 360 then
+        if tmp_word < 360 and tmp2_word > 1080 then
             gosub zero_light_goal
         endif
+        read REGISTER_DAY_PHASE_WORD, word tmp2_word
+        tmp_word = tmp_word * 6 / extra_byte
         write REGISTER_DAY_PHASE_WORD, word tmp_word
     endif
     return
