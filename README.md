@@ -8,13 +8,9 @@ Installing tools for data download
 
 To download data from Lightlog you'll need to set up your machine with some tools.
 
-1) Install the device driver for the USB sync cable, install documentation steps, and driver are available here.
+1) Install the device driver for the USB sync cable, install documentation steps, and driver are available at: http://www.picaxe.com/Software/Drivers/AXE027-USB-Cable-Driver/#download
 
-	http://www.picaxe.com/Software/Drivers/AXE027-USB-Cable-Driver/#download
-
-2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it.
-
-	http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/
+2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it: http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/
 
 3) For Windows, make sure Python is added to your PATH variable, this is covered in the above guide.
 
@@ -24,15 +20,11 @@ To download data from Lightlog you'll need to set up your machine with some tool
 
 	pip install pyserial
 
-5) Download the lightlogdownload.py script from:
-
-    https://raw.githubusercontent.com/garycmartin/lightlogproject/master/python/lightlogdownload.py
+5) Download the lightlogdownload.py script from: https://raw.githubusercontent.com/garycmartin/lightlogproject/master/python/lightlogdownload.py
 
 …or make a local clone of the git repository. Github provides graphical git clients at https://desktop.github.com if needed.
 
-	https://github.com/garycmartin/lightlogproject/blob/master/python/lightlogdownload.py
-
-6) Test that you can run the script ok by trying to check its version:
+6) Test that you can run the script ok by trying to use the command console or a shell window to check the script version:
 
 	python lightlogdownload.py --version
 	Version v0.13
@@ -41,7 +33,7 @@ To download data from Lightlog you'll need to set up your machine with some tool
 
 The usual work flow is to run:
 
-	python lightlogdownload.py
+	python lightlogdownload.py --both
 
 This will try to automatically find the connected serial port and communicate with Lightlog. Hold the button down on the Lightlog when it asks to establish the down link. The script will then download all logged data and save a .csv file of lux values containing red, green, blue, white, epoch seconds, and flags. The auto save file name includes the Light Log's unique ID, and if the save file already exists it will append any new data since the last download. This should make it easy to plug in each device, one after the other, and run the command each week to build up a continuous archive of data. Make sure you grab the data once a week (the default is one record a minute) or you'll have gaps in your data (at one record a minute, the memory holds 7days 14hrs worth of samples).
 
