@@ -8,9 +8,13 @@ Installing tools for data download
 
 To download data from Lightlog you'll need to set up your machine with some tools.
 
-1) Install the device driver for the USB sync cable, install documentation steps, and driver are available at: http://www.picaxe.com/Software/Drivers/AXE027-USB-Cable-Driver/#download
+1) Install the device driver for the USB sync cable, install documentation steps, and driver are available at:
 
-2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it. Please note that the scripts current require Python 2.7: http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/
+<http://www.picaxe.com/Software/Drivers/AXE027-USB-Cable-Driver/#download>
+
+2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it. Please note that the scripts current require Python 2.7:
+
+<http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/>
 
 3) For Windows, make sure Python is added to your PATH variable, this is covered in the above guide.
 
@@ -24,9 +28,11 @@ C:\Python27;C:\Python27\Lib\site-packages\;C:\Python27\Scripts\;
 pip install pyserial
 ```
 
-5) Download the lightlogdownload.py script from: https://raw.githubusercontent.com/garycmartin/lightlogproject/master/python/lightlogdownload.py
+5) Download the lightlogdownload.py script from:
 
-…or make a local clone of the git repository. Github provides graphical git clients at https://desktop.github.com if needed.
+<https://raw.githubusercontent.com/garycmartin/lightlogproject/master/python/lightlogdownload.py>
+
+…or make a local clone of the git repository. Github provides graphical git clients at <https://desktop.github.com> if needed.
 
 6) Test that you can run the script ok by trying to use the command console or a shell window to check the script version:
 
@@ -54,7 +60,7 @@ python -c 'import datetime; print (datetime.datetime(1970,1,1) + datetime.timede
 
 For reference here's the download command's full arguments:
 
-```shell
+```
 $ python lightlogdownload.py --help
 usage: lightlogdownload.py [-h] [-p PORT] [-r] [-b] [--csv-header]
                            [--estimate]
@@ -112,7 +118,7 @@ def calculate_colour_temp(colour):
    return cct
 ```
 
-Here’s another better commented example from Adafruit, where they use a library for the same sensor for Raspberry PI https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code/blob/master/Adafruit_TCS34725/Adafruit_TCS34725.py
+Here’s another better commented example from Adafruit, where they use a library for the same sensor for Raspberry PI <https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code/blob/master/Adafruit_TCS34725/Adafruit_TCS34725.py>
 
 ```python
 def calculate_colour_temp2(colour):
