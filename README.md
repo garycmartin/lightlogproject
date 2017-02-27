@@ -10,7 +10,7 @@ To download data from Lightlog you'll need to set up your machine with some tool
 
 1) Install the device driver for the USB sync cable, install documentation steps, and driver are available at: http://www.picaxe.com/Software/Drivers/AXE027-USB-Cable-Driver/#download
 
-2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it: http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/
+2) For Mac and Linux systems Python is usually already installed. If your using Windows and don’t have Python installed, there's a nice quick guide here if you need it. Please note that the scripts current require Python 2.7: http://www.anthonydebarros.com/2011/10/15/setting-up-python-in-windows-7/
 
 3) For Windows, make sure Python is added to your PATH variable, this is covered in the above guide.
 
