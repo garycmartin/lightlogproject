@@ -67,9 +67,13 @@ For reference here's the download command's full arguments:
 $ python lightlogdownload.py --help
 usage: lightlogdownload.py [-h] [-p PORT] [-r] [-b] [--csv-header]
                            [--estimate]
-                           [-f FILE | --stdout | --cal {2.5k,5k,10k} | --delay DELAY | --phase PHASE | --sample SAMPLE | --status | --reset-memory | --reset-cal | --reset-goal | --factory-reset | -v]
+                           [-f FILE | --stdout | --cal {2.5k,5k,10k} | --delay DELAY |
+                           --phase PHASE | --sample SAMPLE | --status | --reset-memory |
+                           --reset-cal | --reset-goal | --factory-reset | -v]
     
-Download, convert and save data from Lightlog device. Without arguments data will be saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if the log file already exists, new data will be appended to the log.
+Download, convert and save data from Lightlog device. Without arguments data will be
+saved to an auto-named csv file Light_Log_<device_ID>.csv in the current directory, if
+the log file already exists, new data will be appended to the log.
 
 optional arguments:
    -h, --help            show this help message and exit
