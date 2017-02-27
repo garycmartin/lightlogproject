@@ -3,10 +3,10 @@ Lightlog Project
 
 A wearable, Open Source, ambient colour light tracker.
 
-Installing tools for data download
-----------------------------------
+Installation
+------------
 
-To download data from Lightlog you'll need to set up your machine with some tools.
+To download data from Lightlog you'll need to set up your machine with some standard tools.
 
 1) Install the device driver for the USB sync cable, install documentation steps, and driver are available at:
 
@@ -42,6 +42,9 @@ Version v0.13
 ```
 
 7) Finally, plug in the serial cable, attach a Lightlog, and run the script...
+
+Basic workflow
+--------------
 
 The usual work flow is to run:
 
