@@ -186,10 +186,10 @@ def parse_status_header(status):
     # Battery output in mV
     if 'Batt' in status_dict:
         status_dict['Batt'] = int(status_dict['Batt'][:-2])
-        
+
     if 'BattSlp' in status_dict:
         status_dict['BattSlp'] = int(status_dict['BattSlp'][:-2])
-        
+
     if 'BattSen' in status_dict:
         status_dict['BattSen'] = int(status_dict['BattSen'][:-2])
 
@@ -237,10 +237,11 @@ def linear_interpolation(x, HW):
     elif HW == 4:
         # SMT digital sensor
         calibration_data = [(0, 0), (1, 29), (8, 175), (20, 258), (40, 321), (140, 446), (500, 572), (1000, 632), (1500, 658), (2000, 716), (2500, 0x322), (5000, 0x35F), (10000, 0x3A2), (20000, 945), (27000, 953), (85000, 0x3FF)]
+        
     else:
         # LDR prototypes
         calibration_data =  [(0,0), (1, 28), (10, 60), (50, 213), (100, 296), (200, 406), (300, 461), (500, 531), (1000, 633), (2500, 794), (5000, 838), (10000, 862), (20000, 887), (54000, 902), (58000, 903), (60000, 904), (66000, 905), (80000, 908), (85000, 909), (116000, 917), (200000, 1023)]
-    
+
     calibration_data.reverse()
     x = float(x)
     result = None
@@ -382,11 +383,11 @@ def extract_data(data, args, seconds_now, status_dict):
         if args.raw:
             # Raw sensor data
             data_rows.append([r, g, b, w, seconds, flags])
-    
+
         else:
             r, g, b, w = convert_to_lux(r, g, b, w, status_dict)
             data_rows.append([r, g, b, w, seconds, flags])
-            
+
         seconds += STEP_SECONDS
 
     # Check if using stdout (no old data file to check for)
@@ -415,7 +416,7 @@ def extract_data(data, args, seconds_now, status_dict):
             else:
                 # Allow user to force estimate by step seconds
                 skip_rows = 0
-                
+
             if skip_rows != 0:
                 # Interpolate new time stamps using skip_rows scent and last log end
                 print >> sys.stderr, "Good join between previous and new data."
@@ -424,17 +425,17 @@ def extract_data(data, args, seconds_now, status_dict):
                 new_step_seconds = (seconds_now - last_log_end) / float(len(data_rows))
                 for i in range(len(data_rows)):
                     data_rows[i][4] = int(new_seconds + (new_step_seconds * i))
-            
+
             elif data_rows[0][4] < last_log_end:
                 # Estimate using step seconds
                 print >> sys.stderr, "Using step seconds to estimate time stamp."
                 while data_rows[0][4] < last_log_end:
                     data_rows.pop(0)
-    
+
             else:
                 # No scent found and step seconds estimate newer than last log end
                 print >> sys.stderr, "WARNING: estimated %dmin gap between this and previous log data." % (int((data_rows[0][4] - last_log_end) / 60.0))
-            
+
     return data_rows
 
 
@@ -448,7 +449,7 @@ def get_timestamp_from_end_of_file(f):
 def get_scent_from_end_of_file(f):
     """\
     Get last five RGBW data values from end of file.
-    
+
     Could include the extra data value (especially if it gains more unique data).
     """
     f.seek(-2, 2)
@@ -487,25 +488,25 @@ def search_for_scent(data_rows, file_end_scent):
     Search for scent from the end of the last file in the new data set.
     """
     skip_rows = 0
-    
+
     # Check I have scent with some vaguly interesting data in it
     if file_end_scent[0] == file_end_scent[1] and \
         file_end_scent[1] == file_end_scent[2] and \
         file_end_scent[2] == file_end_scent[3] and \
         file_end_scent[3] == file_end_scent[4]:
         return skip_rows
-            
+
     # TODO: toughen code to handle small log file case
     for search_row in range(len(data_rows)):
         if [i[0:4] for i in data_rows[search_row:search_row + 5]] == file_end_scent:
             skip_rows = search_row + 5
             if skip_rows >= len(data_rows):
                 return 0
-                
+
             #TODO: Search from new skip_rows and see if there is another (return 0 if so)
-            
+
             return skip_rows
-    
+
     return skip_rows
 
 
@@ -606,13 +607,13 @@ def main():
         # Strip off status head from data
         status, data = data.split('head_eof')
         status_dict = parse_status_header(status)
-        
+
         # If available use device's sample period
         if 'Period' in status_dict:
             global STEP_SECONDS
             STEP_SECONDS = status_dict['Period']
             print >> sys.stderr, "Using %dsec step" % STEP_SECONDS
-        
+
         if args.stdout:
             data_rows = extract_data(data, args, seconds_now, status_dict)
             output_data_to_stdout(data_rows, args, status_dict)
@@ -642,7 +643,7 @@ def main():
             else:
                 data_rows = extract_data(data, args, seconds_now, status_dict)
                 samples_stored = store_data_to_file(data_rows, args, status_dict)
-                
+
             print >> sys.stderr, 'Device day phase was %dmin, now set to %dmin' % (status_dict['Phase'], minute_since_midnight)
 
             # Calculate suggested delay tuning if we have a reasonable number of samples
@@ -663,7 +664,7 @@ def main():
         print >> sys.stderr, "Battery %dmV" % (status_dict['Batt']),
         if 'BattSen' in status_dict and 'BattSlp' in status_dict:
             print >> sys.stderr, "(sensor:%dmV, sleep:%dmV)" % (status_dict['BattSen'],
-                status_dict['BattSlp'])        
+                status_dict['BattSlp'])
         else:
             print >> sys.stderr
 
